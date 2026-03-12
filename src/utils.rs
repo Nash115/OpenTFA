@@ -14,7 +14,7 @@ pub struct Aabb {
     pub left: f32,
     pub right: f32,
     pub bottom: f32,
-    pub top: f32
+    pub top: f32,
 }
 
 impl Aabb {
@@ -36,9 +36,9 @@ impl Aabb {
     }
 
     pub fn intersects(&self, other: &Self) -> bool {
-        self.left < other.right &&
-        self.right > other.left &&
-        self.bottom < other.top &&
-        self.top > other.bottom
+        self.left < other.right
+            && self.right > other.left
+            && self.bottom < other.top
+            && self.top > other.bottom
     }
 }

@@ -11,14 +11,18 @@ const JUMP_VELOCITY: f32 = 3.5;
 const SLIDE_MAX_VELOCITY: f32 = -1.0;
 const GRAVITY: f32 = -9.81;
 const FORCE_MULTIPLIER: f32 = 50.0;
-const PLAYER_SIZE:Vec2 = Vec2::new(10.0, 15.0);
-const TILE_SIZE:Vec2 = Vec2::new(8.0, 8.0);
+const PLAYER_SIZE: Vec2 = Vec2::new(10.0, 15.0);
+const TILE_SIZE: Vec2 = Vec2::new(8.0, 8.0);
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_systems(Update, spawn_player.run_if(in_state(GameState::InGame)))
-            .add_systems(Update, (update_player, animate_player).chain().run_if(in_state(GameState::InGame)),)
+        app.add_systems(Update, spawn_player.run_if(in_state(GameState::InGame)))
+            .add_systems(
+                Update,
+                (update_player, animate_player)
+                    .chain()
+                    .run_if(in_state(GameState::InGame)),
+            )
             .add_systems(OnExit(GameState::InGame), despawn_players);
     }
 }
@@ -86,15 +90,36 @@ fn spawn_player(
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
     for (spawn_entity, spawn_transform) in query {
-
         let walking_texture = asset_server.load("sprites/blue_archer/walking.png");
-        let walking_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(UVec2::splat(16), 4, 1, None, None));
+        let walking_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
+            UVec2::splat(16),
+            4,
+            1,
+            None,
+            None,
+        ));
         let jumping_texture = asset_server.load("sprites/blue_archer/jumping.png");
-        let jumping_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(UVec2::splat(16), 1, 1, None, None));
+        let jumping_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
+            UVec2::splat(16),
+            1,
+            1,
+            None,
+            None,
+        ));
         let falling_texture = asset_server.load("sprites/blue_archer/falling.png");
-        let falling_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(UVec2::splat(16), 2, 1, None, None));
+        let falling_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
+            UVec2::splat(16),
+            2,
+            1,
+            None,
+            None,
+        ));
 
-        let player_spawn_point = Transform::from_xyz(spawn_transform.translation.x, spawn_transform.translation.y, Z_ENTITIES);
+        let player_spawn_point = Transform::from_xyz(
+            spawn_transform.translation.x,
+            spawn_transform.translation.y,
+            Z_ENTITIES,
+        );
 
         commands.spawn((
             Sprite {
@@ -109,7 +134,7 @@ fn spawn_player(
             Player::new(Vec3::new(
                 spawn_transform.translation.x,
                 spawn_transform.translation.y,
-                Z_ENTITIES
+                Z_ENTITIES,
             )),
             PlayerSprites {
                 walking_texture,
@@ -117,7 +142,7 @@ fn spawn_player(
                 jumping_texture,
                 jumping_layout,
                 falling_texture,
-                falling_layout
+                falling_layout,
             },
             AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
         ));
@@ -131,7 +156,10 @@ fn set_animation(
     layout: &Handle<TextureAtlasLayout>,
     index: usize,
 ) -> bool {
-    let current_layout = sprite.texture_atlas.as_ref().map(|atlas| atlas.layout.clone());
+    let current_layout = sprite
+        .texture_atlas
+        .as_ref()
+        .map(|atlas| atlas.layout.clone());
     let changed = sprite.image != *texture || current_layout != Some(layout.clone());
 
     if changed {
@@ -150,7 +178,6 @@ fn animate_player(
     mut query: Query<(&mut AnimationTimer, &mut Sprite, &PlayerSprites, &Player)>,
 ) {
     for (mut timer, mut sprite, player_sprites, player) in &mut query {
-
         if player.is_jumping() {
             if set_animation(
                 &mut sprite,
@@ -161,8 +188,7 @@ fn animate_player(
                 timer.0.reset();
             }
             continue;
-        }
-        else if player.is_falling() {
+        } else if player.is_falling() {
             if set_animation(
                 &mut sprite,
                 &player_sprites.falling_texture,
@@ -196,8 +222,7 @@ fn animate_player(
                     atlas.index = (atlas.index + 1) % 4;
                 }
             }
-        }
-        else {
+        } else {
             timer.0.reset();
             if let Some(atlas) = &mut sprite.texture_atlas {
                 atlas.index = 0;
@@ -213,9 +238,7 @@ fn update_player(
     collider_query: Query<&Transform, (With<Collider>, Without<Player>)>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-
     for (mut transform, mut player, mut sprite) in &mut player_query {
-        
         // ### HORISONTAL PLAYER CONTROL ###
 
         let mut input_x = 0.0;
@@ -243,12 +266,18 @@ fn update_player(
 
         if player.is_grabbing_ledge {
             player.velocity = Vec3::ZERO;
-            if keyboard_input.just_pressed(KeyCode::Space) || keyboard_input.just_pressed(KeyCode::ArrowUp) || keyboard_input.just_pressed(KeyCode::KeyW) {
+            if keyboard_input.just_pressed(KeyCode::Space)
+                || keyboard_input.just_pressed(KeyCode::ArrowUp)
+                || keyboard_input.just_pressed(KeyCode::KeyW)
+            {
                 player.velocity.y = JUMP_VELOCITY * FORCE_MULTIPLIER * 0.8;
                 player.velocity.x = player.facing_dir * player.speed * 1.2;
                 player.is_grabbing_ledge = false;
             }
-            if keyboard_input.just_pressed(KeyCode::ArrowDown) || keyboard_input.just_pressed(KeyCode::KeyS) || (input_x != 0.0 && player.facing_dir != input_x) {
+            if keyboard_input.just_pressed(KeyCode::ArrowDown)
+                || keyboard_input.just_pressed(KeyCode::KeyS)
+                || (input_x != 0.0 && player.facing_dir != input_x)
+            {
                 player.is_grabbing_ledge = false;
             }
             transform.translation += player.velocity * time.delta_secs();
@@ -256,7 +285,7 @@ fn update_player(
         }
 
         // ### GRAVITY ###
-        
+
         player.velocity.y += GRAVITY * FORCE_MULTIPLIER * time.delta_secs();
 
         // ### WALL INTERACTIONS # JUMP ###
@@ -276,8 +305,7 @@ fn update_player(
         if keyboard_input.just_pressed(KeyCode::Space) {
             if !player.is_airborne {
                 player.velocity.y = JUMP_VELOCITY * FORCE_MULTIPLIER;
-            }
-            else if let Some(wall_dir) = player.on_wall {
+            } else if let Some(wall_dir) = player.on_wall {
                 player.velocity.y = JUMP_VELOCITY * FORCE_MULTIPLIER * 0.9;
                 player.velocity.x = -wall_dir * player.speed * 2.0;
                 player.on_wall = None;
@@ -287,7 +315,7 @@ fn update_player(
         // ### COLLISION RESOLUTION ###
 
         let delta = player.velocity * time.delta_secs();
-        
+
         // --- MOVE HORIZONTALLY ---
         transform.translation.x += delta.x;
         let player_box = Aabb::new_sprite_box(transform.translation, PLAYER_SIZE);
@@ -322,7 +350,6 @@ fn update_player(
 
         // ### UPDATE STATUS ###
 
-
         // --- Airborne ---
 
         player.is_airborne = player.velocity.y.abs() > 0.0 + f32::EPSILON;
@@ -332,12 +359,20 @@ fn update_player(
         // - Look for a wall on the left and right side of the player -
         player.on_wall = None;
         let left_box = Aabb::new_sprite_box(
-            Vec3::new(transform.translation.x-1.0, transform.translation.y, transform.translation.z),
-            PLAYER_SIZE
+            Vec3::new(
+                transform.translation.x - 1.0,
+                transform.translation.y,
+                transform.translation.z,
+            ),
+            PLAYER_SIZE,
         );
         let right_box = Aabb::new_sprite_box(
-            Vec3::new(transform.translation.x+1.0, transform.translation.y, transform.translation.z),
-            PLAYER_SIZE
+            Vec3::new(
+                transform.translation.x + 1.0,
+                transform.translation.y,
+                transform.translation.z,
+            ),
+            PLAYER_SIZE,
         );
         for collider_transform in &collider_query {
             let wall_box = Aabb::new_tile_box(collider_transform.translation, TILE_SIZE);
@@ -354,18 +389,34 @@ fn update_player(
         // --- Check for ledge grabbing ---
 
         let wall_dir = player.on_wall.unwrap_or(0.0);
-        if player.is_airborne && wall_dir != 0.0 && wall_dir == input_x && wall_dir == player.facing_dir {
+        if player.is_airborne
+            && wall_dir != 0.0
+            && wall_dir == input_x
+            && wall_dir == player.facing_dir
+        {
             let knees_box = Aabb::new_sprite_box(
-                Vec3::new(transform.translation.x + player.facing_dir * (PLAYER_SIZE.x / 2.0), transform.translation.y - (PLAYER_SIZE.y / 3.0), transform.translation.z),
-                PLAYER_SIZE * Vec2::new(0.5, 0.1)
+                Vec3::new(
+                    transform.translation.x + player.facing_dir * (PLAYER_SIZE.x / 2.0),
+                    transform.translation.y - (PLAYER_SIZE.y / 3.0),
+                    transform.translation.z,
+                ),
+                PLAYER_SIZE * Vec2::new(0.5, 0.1),
             );
             let head_box = Aabb::new_sprite_box(
-                Vec3::new(transform.translation.x + player.facing_dir * (PLAYER_SIZE.x / 2.0), transform.translation.y + (PLAYER_SIZE.y / 3.0), transform.translation.z),
-                PLAYER_SIZE * Vec2::new(0.5, 0.1)
+                Vec3::new(
+                    transform.translation.x + player.facing_dir * (PLAYER_SIZE.x / 2.0),
+                    transform.translation.y + (PLAYER_SIZE.y / 3.0),
+                    transform.translation.z,
+                ),
+                PLAYER_SIZE * Vec2::new(0.5, 0.1),
             );
             let bottom_box = Aabb::new_sprite_box(
-                Vec3::new(transform.translation.x, transform.translation.y - (PLAYER_SIZE.y / 2.0), transform.translation.z),
-                PLAYER_SIZE * Vec2::new(0.5, 1.0)
+                Vec3::new(
+                    transform.translation.x,
+                    transform.translation.y - (PLAYER_SIZE.y / 2.0),
+                    transform.translation.z,
+                ),
+                PLAYER_SIZE * Vec2::new(0.5, 1.0),
             );
             let mut bottom_not_touching_wall = true;
             let mut head_not_touching_wall = true;
@@ -388,7 +439,6 @@ fn update_player(
                 player.is_grabbing_ledge = true;
             }
         }
-
     }
 }
 

@@ -1,6 +1,6 @@
+use crate::GameState;
 use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
-use crate::GameState;
 
 use crate::utils::{Z_TILES_BACK, Z_TILES_FG};
 
@@ -8,8 +8,7 @@ pub struct LevelPlugin;
 
 impl Plugin for LevelPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_plugins(LdtkPlugin)
+        app.add_plugins(LdtkPlugin)
             .insert_resource(LdtkSettings {
                 int_grid_rendering: IntGridRendering::Invisible,
                 ..default()
@@ -55,15 +54,13 @@ fn despawn_level(mut commands: Commands, query: Query<Entity, With<ActiveLevel>>
     }
 }
 
-fn sort_ldtk_layers(
-    mut query: Query<(&mut Transform, &LayerMetadata), Added<LayerMetadata>>,
-) {
+fn sort_ldtk_layers(mut query: Query<(&mut Transform, &LayerMetadata), Added<LayerMetadata>>) {
     for (mut transform, layer_meta) in query.iter_mut() {
         match layer_meta.identifier.as_str() {
             "VisualBackground" => transform.translation.z = Z_TILES_BACK,
             "VisualForeground" => transform.translation.z = Z_TILES_FG,
-            "Collisions" => {},
-            "Entities" => {},
+            "Collisions" => {}
+            "Entities" => {}
             _ => {
                 println!("Warning: Unrecognized layer '{}'", layer_meta.identifier);
             }

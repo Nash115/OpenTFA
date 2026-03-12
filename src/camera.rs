@@ -11,9 +11,11 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_systems(Startup, setup_camera)
-            .add_systems(Update, fit_camera_to_level.run_if(in_state(GameState::InGame)))
+        app.add_systems(Startup, setup_camera)
+            .add_systems(
+                Update,
+                fit_camera_to_level.run_if(in_state(GameState::InGame)),
+            )
             .add_systems(OnEnter(GameState::Menu), reset_camera_for_menu);
     }
 }
@@ -40,7 +42,8 @@ fn fit_camera_to_level(
         return;
     }
 
-    let Some(level_size) = resolve_level_size(&world_query, &ldtk_projects, &level_selection) else {
+    let Some(level_size) = resolve_level_size(&world_query, &ldtk_projects, &level_selection)
+    else {
         return;
     };
 
