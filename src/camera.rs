@@ -3,9 +3,9 @@ use bevy::{
     prelude::*,
     window::PrimaryWindow,
 };
-use bevy_ecs_ldtk::prelude::*;
 
 use crate::GameState;
+use crate::level::WorldLimits;
 
 pub struct CameraPlugin;
 
@@ -30,9 +30,7 @@ fn setup_camera(mut commands: Commands) {
 fn fit_camera_to_level(
     mut camera_query: Query<(&mut Transform, &mut Projection, &mut Camera), With<GameCamera>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
-    world_query: Query<&LdtkProjectHandle>,
-    ldtk_projects: Res<Assets<LdtkProject>>,
-    level_selection: Res<LevelSelection>,
+    world_limits_query: Query<&WorldLimits>,
 ) {
     let Ok(window) = window_query.single() else {
         return;
@@ -42,10 +40,12 @@ fn fit_camera_to_level(
         return;
     }
 
-    let Some(level_size) = resolve_level_size(&world_query, &ldtk_projects, &level_selection)
-    else {
-        return;
+    let world_limits = match world_limits_query.single() {
+        Ok(limits) => limits,
+        Err(_) => return,
     };
+
+    let level_size = Vec2::new(world_limits.width, world_limits.height);
 
     let Ok((mut transform, mut projection, mut camera)) = camera_query.single_mut() else {
         return;
@@ -88,23 +88,6 @@ fn fit_camera_to_level(
         physical_size: viewport_size,
         ..default()
     });
-}
-
-fn resolve_level_size(
-    world_query: &Query<&LdtkProjectHandle>,
-    ldtk_projects: &Res<Assets<LdtkProject>>,
-    level_selection: &Res<LevelSelection>,
-) -> Option<Vec2> {
-    for project_handle in world_query.iter() {
-        let project = ldtk_projects.get(project_handle.id())?;
-        let level = project.find_raw_level_by_level_selection(level_selection.as_ref())?;
-
-        if level.px_wid > 0 && level.px_hei > 0 {
-            return Some(Vec2::new(level.px_wid as f32, level.px_hei as f32));
-        }
-    }
-
-    None
 }
 
 fn reset_camera_for_menu(

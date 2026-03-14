@@ -1,6 +1,7 @@
 mod camera;
 mod level;
 mod menu;
+mod physics;
 mod player;
 mod utils;
 
@@ -10,6 +11,7 @@ use bevy_ecs_ldtk::prelude::*;
 use camera::CameraPlugin;
 use level::LevelPlugin;
 use menu::MenuPlugin;
+use physics::PhysicsPlugin;
 use player::PlayerPlugin;
 
 #[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
@@ -36,6 +38,7 @@ fn main() {
         .add_plugins(LevelPlugin)
         .insert_resource(LevelSelection::index(0))
         .add_plugins(MenuPlugin)
+        .add_plugins(PhysicsPlugin)
         .add_plugins(PlayerPlugin)
         .add_plugins(CameraPlugin)
         .run();

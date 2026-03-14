@@ -29,7 +29,7 @@ If an extra layer is present, a warning will be displayed and its position canno
 
 ### Required Entities
 
-- `PlayerSpawn`
+- `PlayerSpawn`, you can add a `facing_dir` field (of type `Float`) to specify the spawn direction (`-1.0` for left, `1.0` for right)
 
 Without `PlayerSpawn`, no player will be created.
 

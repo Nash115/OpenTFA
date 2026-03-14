@@ -2,7 +2,8 @@ use bevy::prelude::*;
 
 use crate::GameState;
 
-use crate::level::{Collider, SpawnPoint};
+use crate::level::{Collider, SpawnFacingDir, SpawnPoint};
+use crate::physics::Wrapable;
 use crate::utils::{Aabb, Z_ENTITIES};
 
 pub struct PlayerPlugin;
@@ -34,18 +35,20 @@ pub struct Player {
     pub spawn_point: Vec3,
     pub is_airborne: bool,
     pub on_wall: Option<f32>,
+    pub is_sliding: bool,
     pub facing_dir: f32,
     pub is_grabbing_ledge: bool,
 }
 impl Player {
-    fn new(spawn_point: Vec3) -> Self {
+    fn new(spawn_point: Vec3, spawn_facing_dir: f32) -> Self {
         Self {
-            speed: 80.0,
+            speed: 70.0,
             velocity: Vec3::ZERO,
             spawn_point,
             is_airborne: false,
             on_wall: None,
-            facing_dir: -1.0,
+            is_sliding: false,
+            facing_dir: spawn_facing_dir,
             is_grabbing_ledge: false,
         }
     }
@@ -64,6 +67,7 @@ impl Player {
         self.velocity = Vec3::ZERO;
         self.is_airborne = false;
         self.on_wall = None;
+        self.is_sliding = false;
         self.facing_dir = -1.0;
         self.is_grabbing_ledge = false;
         *translation = self.spawn_point;
@@ -78,6 +82,8 @@ pub struct PlayerSprites {
     pub jumping_layout: Handle<TextureAtlasLayout>,
     pub falling_texture: Handle<Image>,
     pub falling_layout: Handle<TextureAtlasLayout>,
+    pub sliding_texture: Handle<Image>,
+    pub sliding_layout: Handle<TextureAtlasLayout>,
 }
 
 #[derive(Component)]
@@ -85,11 +91,11 @@ pub struct AnimationTimer(Timer);
 
 fn spawn_player(
     mut commands: Commands,
-    query: Query<(Entity, &Transform), Added<SpawnPoint>>,
+    query: Query<(Entity, &Transform, &SpawnFacingDir), Added<SpawnPoint>>,
     asset_server: Res<AssetServer>,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
-    for (spawn_entity, spawn_transform) in query {
+    for (spawn_entity, spawn_transform, spawn_facing_dir) in query {
         let walking_texture = asset_server.load("sprites/blue_archer/walking.png");
         let walking_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
             UVec2::splat(16),
@@ -114,6 +120,14 @@ fn spawn_player(
             None,
             None,
         ));
+        let sliding_texture = asset_server.load("sprites/blue_archer/sliding.png");
+        let sliding_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
+            UVec2::splat(16),
+            2,
+            1,
+            None,
+            None,
+        ));
 
         let player_spawn_point = Transform::from_xyz(
             spawn_transform.translation.x,
@@ -128,14 +142,18 @@ fn spawn_player(
                     layout: walking_layout.clone(),
                     index: 0,
                 }),
+                flip_x: spawn_facing_dir.0 == -1.0,
                 ..default()
             },
             player_spawn_point,
-            Player::new(Vec3::new(
-                spawn_transform.translation.x,
-                spawn_transform.translation.y,
-                Z_ENTITIES,
-            )),
+            Player::new(
+                Vec3::new(
+                    spawn_transform.translation.x,
+                    spawn_transform.translation.y,
+                    Z_ENTITIES,
+                ),
+                spawn_facing_dir.0,
+            ),
             PlayerSprites {
                 walking_texture,
                 walking_layout,
@@ -143,8 +161,11 @@ fn spawn_player(
                 jumping_layout,
                 falling_texture,
                 falling_layout,
+                sliding_texture,
+                sliding_layout,
             },
             AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+            Wrapable,
         ));
         commands.entity(spawn_entity).despawn();
     }
@@ -178,7 +199,17 @@ fn animate_player(
     mut query: Query<(&mut AnimationTimer, &mut Sprite, &PlayerSprites, &Player)>,
 ) {
     for (mut timer, mut sprite, player_sprites, player) in &mut query {
-        if player.is_jumping() {
+        if player.is_grabbing_ledge || player.is_sliding {
+            if set_animation(
+                &mut sprite,
+                &player_sprites.sliding_texture,
+                &player_sprites.sliding_layout,
+                0,
+            ) {
+                timer.0.reset();
+            }
+            continue;
+        } else if player.is_jumping() {
             if set_animation(
                 &mut sprite,
                 &player_sprites.jumping_texture,
@@ -270,17 +301,24 @@ fn update_player(
                 || keyboard_input.just_pressed(KeyCode::ArrowUp)
                 || keyboard_input.just_pressed(KeyCode::KeyW)
             {
-                player.velocity.y = JUMP_VELOCITY * FORCE_MULTIPLIER * 0.8;
-                player.velocity.x = player.facing_dir * player.speed * 1.2;
                 player.is_grabbing_ledge = false;
+                player.velocity.y = JUMP_VELOCITY * FORCE_MULTIPLIER;
+                break;
             }
+            let wall_dir = match player.on_wall {
+                Some(dir) => dir,
+                None => {
+                    player.is_grabbing_ledge = false;
+                    break;
+                }
+            };
             if keyboard_input.just_pressed(KeyCode::ArrowDown)
                 || keyboard_input.just_pressed(KeyCode::KeyS)
-                || (input_x != 0.0 && player.facing_dir != input_x)
+                || (wall_dir == -1.0 && !keyboard_input.pressed(KeyCode::KeyA))
+                || (wall_dir == 1.0 && !keyboard_input.pressed(KeyCode::KeyD))
             {
                 player.is_grabbing_ledge = false;
             }
-            transform.translation += player.velocity * time.delta_secs();
             continue;
         }
 
@@ -292,11 +330,9 @@ fn update_player(
 
         // --- Wall Sliding ---
 
-        if let Some(wall_dir) = player.on_wall {
-            if player.is_airborne && player.velocity.y < 0.0 && input_x == wall_dir {
-                if player.velocity.y < (SLIDE_MAX_VELOCITY * FORCE_MULTIPLIER) {
-                    player.velocity.y = SLIDE_MAX_VELOCITY * FORCE_MULTIPLIER;
-                }
+        if player.is_sliding {
+            if player.velocity.y < (SLIDE_MAX_VELOCITY * FORCE_MULTIPLIER) {
+                player.velocity.y = SLIDE_MAX_VELOCITY * FORCE_MULTIPLIER;
             }
         }
 
@@ -386,10 +422,22 @@ fn update_player(
             }
         }
 
+        // --- Check for sliding ---
+        if let Some(wall_dir) = player.on_wall {
+            if player.is_airborne && player.velocity.y < 0.0 && input_x == wall_dir {
+                player.is_sliding = true;
+            } else {
+                player.is_sliding = false;
+            }
+        } else {
+            player.is_sliding = false;
+        }
+
         // --- Check for ledge grabbing ---
 
         let wall_dir = player.on_wall.unwrap_or(0.0);
         if player.is_airborne
+            && player.velocity.y < 0.0
             && wall_dir != 0.0
             && wall_dir == input_x
             && wall_dir == player.facing_dir
@@ -397,7 +445,7 @@ fn update_player(
             let knees_box = Aabb::new_sprite_box(
                 Vec3::new(
                     transform.translation.x + player.facing_dir * (PLAYER_SIZE.x / 2.0),
-                    transform.translation.y - (PLAYER_SIZE.y / 3.0),
+                    transform.translation.y - (PLAYER_SIZE.y / 4.0),
                     transform.translation.z,
                 ),
                 PLAYER_SIZE * Vec2::new(0.5, 0.1),
