@@ -1,14 +1,4 @@
-use bevy::prelude::*;
-
-// --- Z-indexes for rendering order ---
-
-pub const Z_TILES_BACK: f32 = 1.0;
-pub const Z_ENTITIES: f32 = 5.0;
-pub const Z_TILES_FG: f32 = 10.0;
-#[allow(dead_code)]
-pub const Z_UI: f32 = 100.0;
-
-// --- Aabb implementation for collision detection ---
+use crate::prelude::*;
 
 pub struct Aabb {
     pub left: f32,

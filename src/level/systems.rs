@@ -1,64 +1,8 @@
-use crate::GameState;
-use bevy::prelude::*;
-use bevy_ecs_ldtk::prelude::*;
+use crate::prelude::*;
 
-use crate::utils::{Z_TILES_BACK, Z_TILES_FG};
+use super::components::*;
 
-pub struct LevelPlugin;
-
-impl Plugin for LevelPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_plugins(LdtkPlugin)
-            .insert_resource(LdtkSettings {
-                int_grid_rendering: IntGridRendering::Invisible,
-                ..default()
-            })
-            .register_ldtk_int_cell::<WallBundle>(1)
-            .register_ldtk_entity::<SpawnPointBundle>("PlayerSpawn")
-            .add_systems(OnEnter(GameState::InGame), setup_level)
-            .add_systems(
-                Update,
-                setup_world_limits.run_if(
-                    in_state(GameState::InGame).and(not(any_with_component::<WorldLimits>)),
-                ),
-            )
-            .add_systems(Update, sort_ldtk_layers.run_if(in_state(GameState::InGame)))
-            .add_systems(OnExit(GameState::InGame), despawn_level);
-    }
-}
-
-#[derive(Component, Default)]
-pub struct Collider;
-#[derive(Bundle, LdtkIntCell, Default)]
-pub struct WallBundle {
-    collider: Collider,
-}
-
-#[derive(Component, Default)]
-pub struct SpawnPoint;
-#[derive(Default, Component)]
-pub struct SpawnFacingDir(pub f32);
-#[derive(Bundle, LdtkEntity, Default)]
-pub struct SpawnPointBundle {
-    #[with(extract_facing_dir)]
-    pub spawn_facing_dir: SpawnFacingDir,
-    spawn_point: SpawnPoint,
-}
-
-#[derive(Component)]
-struct ActiveLevel;
-
-#[derive(Component)]
-pub struct WorldLimits {
-    pub width: f32,
-    pub height: f32,
-    pub left: f32,
-    pub right: f32,
-    pub bottom: f32,
-    pub top: f32,
-}
-
-fn setup_level(mut commands: Commands, asset_server: Res<AssetServer>) {
+pub fn setup_level(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         LdtkWorldBundle {
             ldtk_handle: asset_server.load("levels/cave.ldtk").into(),
@@ -68,7 +12,7 @@ fn setup_level(mut commands: Commands, asset_server: Res<AssetServer>) {
     ));
 }
 
-fn setup_world_limits(
+pub fn setup_world_limits(
     mut commands: Commands,
     world_query: Query<&LdtkProjectHandle>,
     ldtk_projects: Res<Assets<LdtkProject>>,
@@ -91,7 +35,7 @@ fn setup_world_limits(
     ));
 }
 
-fn extract_facing_dir(entity_instance: &EntityInstance) -> SpawnFacingDir {
+pub fn extract_facing_dir(entity_instance: &EntityInstance) -> SpawnFacingDir {
     let facing_dir_value = entity_instance
         .get_float_field("facing_dir")
         .copied()
@@ -102,13 +46,13 @@ fn extract_facing_dir(entity_instance: &EntityInstance) -> SpawnFacingDir {
     SpawnFacingDir(facing_dir_value)
 }
 
-fn despawn_level(mut commands: Commands, query: Query<Entity, With<ActiveLevel>>) {
+pub fn despawn_level(mut commands: Commands, query: Query<Entity, With<ActiveLevel>>) {
     for entity in &query {
         commands.entity(entity).despawn();
     }
 }
 
-fn sort_ldtk_layers(mut query: Query<(&mut Transform, &LayerMetadata), Added<LayerMetadata>>) {
+pub fn sort_ldtk_layers(mut query: Query<(&mut Transform, &LayerMetadata), Added<LayerMetadata>>) {
     for (mut transform, layer_meta) in query.iter_mut() {
         match layer_meta.identifier.as_str() {
             "VisualBackground" => transform.translation.z = Z_TILES_BACK,
@@ -122,7 +66,7 @@ fn sort_ldtk_layers(mut query: Query<(&mut Transform, &LayerMetadata), Added<Lay
     }
 }
 
-fn resolve_level_size(
+pub fn resolve_level_size(
     world_query: &Query<&LdtkProjectHandle>,
     ldtk_projects: &Res<Assets<LdtkProject>>,
     level_selection: &Res<LevelSelection>,

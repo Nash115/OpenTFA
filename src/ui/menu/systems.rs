@@ -1,21 +1,10 @@
-use bevy::{app::AppExit, prelude::*};
+use crate::prelude::*;
 
-use crate::GameState;
+use crate::utils::consts::Z_UI;
 
-pub struct MenuPlugin;
+use super::components::MenuEntity;
 
-impl Plugin for MenuPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::Menu), setup_menu)
-            .add_systems(Update, menu_input.run_if(in_state(GameState::Menu)))
-            .add_systems(OnExit(GameState::Menu), cleanup_menu);
-    }
-}
-
-#[derive(Component)]
-struct MenuEntity;
-
-fn setup_menu(mut commands: Commands) {
+pub fn setup_menu(mut commands: Commands) {
     commands.spawn((
         Text2d::new("OpenTFA\nPress Return to play"),
         TextFont {
@@ -23,12 +12,12 @@ fn setup_menu(mut commands: Commands) {
             ..default()
         },
         TextColor(Color::WHITE),
-        Transform::from_xyz(0.0, 0.0, 10.0),
+        Transform::from_xyz(0.0, 0.0, Z_UI),
         MenuEntity,
     ));
 }
 
-fn menu_input(
+pub fn menu_input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameState>>,
     mut app_exit: MessageWriter<AppExit>,
@@ -41,7 +30,7 @@ fn menu_input(
     }
 }
 
-fn cleanup_menu(mut commands: Commands, query: Query<Entity, With<MenuEntity>>) {
+pub fn cleanup_menu(mut commands: Commands, query: Query<Entity, With<MenuEntity>>) {
     for entity in &query {
         commands.entity(entity).despawn();
     }

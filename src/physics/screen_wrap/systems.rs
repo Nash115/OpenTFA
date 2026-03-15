@@ -1,33 +1,10 @@
-use bevy::prelude::*;
+use crate::prelude::*;
 
-use crate::GameState;
 use crate::level::WorldLimits;
 
-pub struct PhysicsPlugin;
+use super::components::*;
 
-impl Plugin for PhysicsPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            screen_wrap_system.run_if(in_state(GameState::InGame)),
-        )
-        .add_systems(
-            Update,
-            manage_visual_clones.run_if(in_state(GameState::InGame)),
-        );
-    }
-}
-
-#[derive(Component)]
-pub struct Wrapable;
-
-#[derive(Component)]
-pub struct VisualClone {
-    parent_entity: Entity,
-    offset: Vec3,
-}
-
-fn screen_wrap_system(
+pub fn screen_wrap_system(
     mut query: Query<&mut Transform, With<Wrapable>>,
     world_limits: Query<&WorldLimits>,
 ) {
@@ -50,7 +27,7 @@ fn screen_wrap_system(
     }
 }
 
-fn manage_visual_clones(
+pub fn manage_visual_clones(
     mut commands: Commands,
     world_limits_query: Query<&WorldLimits>,
     parent_query: Query<(Entity, &Transform, &Sprite), With<Wrapable>>,

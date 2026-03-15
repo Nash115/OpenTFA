@@ -1,37 +1,23 @@
-use bevy::{
-    camera::{ScalingMode, Viewport},
-    prelude::*,
-    window::PrimaryWindow,
-};
+use crate::prelude::*;
 
-use crate::GameState;
 use crate::level::WorldLimits;
 
-pub struct CameraPlugin;
+use super::components::*;
 
-impl Plugin for CameraPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_camera)
-            .add_systems(
-                Update,
-                fit_camera_to_level.run_if(in_state(GameState::InGame)),
-            )
-            .add_systems(OnEnter(GameState::Menu), reset_camera_for_menu);
-    }
-}
-
-#[derive(Component)]
-struct GameCamera;
-
-fn setup_camera(mut commands: Commands) {
+pub fn setup_camera(mut commands: Commands) {
     commands.spawn((Camera2d, GameCamera));
 }
 
-fn fit_camera_to_level(
+pub fn fit_camera_to_level(
     mut camera_query: Query<(&mut Transform, &mut Projection, &mut Camera), With<GameCamera>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
-    world_limits_query: Query<&WorldLimits>,
+    world_limits_query: Query<&WorldLimits, Added<WorldLimits>>,
 ) {
+    let world_limits = match world_limits_query.single() {
+        Ok(limits) => limits,
+        Err(_) => return,
+    };
+
     let Ok(window) = window_query.single() else {
         return;
     };
@@ -39,11 +25,6 @@ fn fit_camera_to_level(
     if window.height() <= 0.0 {
         return;
     }
-
-    let world_limits = match world_limits_query.single() {
-        Ok(limits) => limits,
-        Err(_) => return,
-    };
 
     let level_size = Vec2::new(world_limits.width, world_limits.height);
 
@@ -90,7 +71,7 @@ fn fit_camera_to_level(
     });
 }
 
-fn reset_camera_for_menu(
+pub fn reset_camera_for_menu(
     mut camera_query: Query<(&mut Transform, &mut Projection, &mut Camera), With<Camera2d>>,
 ) {
     let Ok((mut transform, mut projection, mut camera)) = camera_query.single_mut() else {

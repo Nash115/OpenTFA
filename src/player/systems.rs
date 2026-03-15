@@ -1,95 +1,13 @@
-use bevy::prelude::*;
-
-use crate::GameState;
+use crate::prelude::*;
 
 use crate::level::{Collider, SpawnFacingDir, SpawnPoint};
-use crate::physics::Wrapable;
-use crate::utils::{Aabb, Z_ENTITIES};
+use crate::physics::screen_wrap::components::Wrapable;
+use crate::utils::aabb::*;
 
-pub struct PlayerPlugin;
+use super::components::*;
+use super::utils::*;
 
-const JUMP_VELOCITY: f32 = 3.5;
-const SLIDE_MAX_VELOCITY: f32 = -1.0;
-const GRAVITY: f32 = -9.81;
-const FORCE_MULTIPLIER: f32 = 50.0;
-const PLAYER_SIZE: Vec2 = Vec2::new(10.0, 15.0);
-const TILE_SIZE: Vec2 = Vec2::new(8.0, 8.0);
-
-impl Plugin for PlayerPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Update, spawn_player.run_if(in_state(GameState::InGame)))
-            .add_systems(
-                Update,
-                (update_player, animate_player)
-                    .chain()
-                    .run_if(in_state(GameState::InGame)),
-            )
-            .add_systems(OnExit(GameState::InGame), despawn_players);
-    }
-}
-
-#[derive(Component, Clone, Copy)]
-pub struct Player {
-    pub speed: f32,
-    pub velocity: Vec3,
-    pub spawn_point: Vec3,
-    pub is_airborne: bool,
-    pub on_wall: Option<f32>,
-    pub is_sliding: bool,
-    pub facing_dir: f32,
-    pub is_grabbing_ledge: bool,
-}
-impl Player {
-    fn new(spawn_point: Vec3, spawn_facing_dir: f32) -> Self {
-        Self {
-            speed: 70.0,
-            velocity: Vec3::ZERO,
-            spawn_point,
-            is_airborne: false,
-            on_wall: None,
-            is_sliding: false,
-            facing_dir: spawn_facing_dir,
-            is_grabbing_ledge: false,
-        }
-    }
-
-    fn is_walking(self) -> bool {
-        self.velocity.x.abs() > 0.0 + f32::EPSILON
-    }
-    fn is_falling(self) -> bool {
-        self.velocity.y < 0.0 - f32::EPSILON
-    }
-    fn is_jumping(self) -> bool {
-        self.velocity.y > 0.0 + f32::EPSILON
-    }
-
-    fn respawn(&mut self, translation: &mut Vec3) {
-        self.velocity = Vec3::ZERO;
-        self.is_airborne = false;
-        self.on_wall = None;
-        self.is_sliding = false;
-        self.facing_dir = -1.0;
-        self.is_grabbing_ledge = false;
-        *translation = self.spawn_point;
-    }
-}
-
-#[derive(Component)]
-pub struct PlayerSprites {
-    pub walking_texture: Handle<Image>,
-    pub walking_layout: Handle<TextureAtlasLayout>,
-    pub jumping_texture: Handle<Image>,
-    pub jumping_layout: Handle<TextureAtlasLayout>,
-    pub falling_texture: Handle<Image>,
-    pub falling_layout: Handle<TextureAtlasLayout>,
-    pub sliding_texture: Handle<Image>,
-    pub sliding_layout: Handle<TextureAtlasLayout>,
-}
-
-#[derive(Component)]
-pub struct AnimationTimer(Timer);
-
-fn spawn_player(
+pub fn spawn_player(
     mut commands: Commands,
     query: Query<(Entity, &Transform, &SpawnFacingDir), Added<SpawnPoint>>,
     asset_server: Res<AssetServer>,
@@ -171,98 +89,7 @@ fn spawn_player(
     }
 }
 
-fn set_animation(
-    sprite: &mut Sprite,
-    texture: &Handle<Image>,
-    layout: &Handle<TextureAtlasLayout>,
-    index: usize,
-) -> bool {
-    let current_layout = sprite
-        .texture_atlas
-        .as_ref()
-        .map(|atlas| atlas.layout.clone());
-    let changed = sprite.image != *texture || current_layout != Some(layout.clone());
-
-    if changed {
-        sprite.image = texture.clone();
-        sprite.texture_atlas = Some(TextureAtlas {
-            layout: layout.clone(),
-            index,
-        });
-    }
-
-    changed
-}
-
-fn animate_player(
-    time: Res<Time>,
-    mut query: Query<(&mut AnimationTimer, &mut Sprite, &PlayerSprites, &Player)>,
-) {
-    for (mut timer, mut sprite, player_sprites, player) in &mut query {
-        if player.is_grabbing_ledge || player.is_sliding {
-            if set_animation(
-                &mut sprite,
-                &player_sprites.sliding_texture,
-                &player_sprites.sliding_layout,
-                0,
-            ) {
-                timer.0.reset();
-            }
-            continue;
-        } else if player.is_jumping() {
-            if set_animation(
-                &mut sprite,
-                &player_sprites.jumping_texture,
-                &player_sprites.jumping_layout,
-                0,
-            ) {
-                timer.0.reset();
-            }
-            continue;
-        } else if player.is_falling() {
-            if set_animation(
-                &mut sprite,
-                &player_sprites.falling_texture,
-                &player_sprites.falling_layout,
-                0,
-            ) {
-                timer.0.reset();
-            }
-            timer.0.tick(time.delta());
-            if timer.0.just_finished() {
-                if let Some(atlas) = &mut sprite.texture_atlas {
-                    atlas.index = (atlas.index + 1) % 2;
-                }
-            }
-            continue;
-        }
-
-        if set_animation(
-            &mut sprite,
-            &player_sprites.walking_texture,
-            &player_sprites.walking_layout,
-            0,
-        ) {
-            timer.0.reset();
-        }
-
-        if player.is_walking() {
-            timer.0.tick(time.delta());
-            if timer.0.just_finished() {
-                if let Some(atlas) = &mut sprite.texture_atlas {
-                    atlas.index = (atlas.index + 1) % 4;
-                }
-            }
-        } else {
-            timer.0.reset();
-            if let Some(atlas) = &mut sprite.texture_atlas {
-                atlas.index = 0;
-            }
-        }
-    }
-}
-
-fn update_player(
+pub fn update_player(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     mut player_query: Query<(&mut Transform, &mut Player, &mut Sprite)>,
@@ -490,7 +317,75 @@ fn update_player(
     }
 }
 
-fn despawn_players(mut commands: Commands, query: Query<Entity, With<Player>>) {
+pub fn animate_player(
+    time: Res<Time>,
+    mut query: Query<(&mut AnimationTimer, &mut Sprite, &PlayerSprites, &Player)>,
+) {
+    for (mut timer, mut sprite, player_sprites, player) in &mut query {
+        if player.is_grabbing_ledge || player.is_sliding {
+            if set_animation(
+                &mut sprite,
+                &player_sprites.sliding_texture,
+                &player_sprites.sliding_layout,
+                0,
+            ) {
+                timer.0.reset();
+            }
+            continue;
+        } else if player.is_jumping() {
+            if set_animation(
+                &mut sprite,
+                &player_sprites.jumping_texture,
+                &player_sprites.jumping_layout,
+                0,
+            ) {
+                timer.0.reset();
+            }
+            continue;
+        } else if player.is_falling() {
+            if set_animation(
+                &mut sprite,
+                &player_sprites.falling_texture,
+                &player_sprites.falling_layout,
+                0,
+            ) {
+                timer.0.reset();
+            }
+            timer.0.tick(time.delta());
+            if timer.0.just_finished() {
+                if let Some(atlas) = &mut sprite.texture_atlas {
+                    atlas.index = (atlas.index + 1) % 2;
+                }
+            }
+            continue;
+        }
+
+        if set_animation(
+            &mut sprite,
+            &player_sprites.walking_texture,
+            &player_sprites.walking_layout,
+            0,
+        ) {
+            timer.0.reset();
+        }
+
+        if player.is_walking() {
+            timer.0.tick(time.delta());
+            if timer.0.just_finished() {
+                if let Some(atlas) = &mut sprite.texture_atlas {
+                    atlas.index = (atlas.index + 1) % 4;
+                }
+            }
+        } else {
+            timer.0.reset();
+            if let Some(atlas) = &mut sprite.texture_atlas {
+                atlas.index = 0;
+            }
+        }
+    }
+}
+
+pub fn despawn_players(mut commands: Commands, query: Query<Entity, With<Player>>) {
     for entity in &query {
         commands.entity(entity).despawn();
     }
