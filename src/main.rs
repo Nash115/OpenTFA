@@ -3,24 +3,17 @@ mod level;
 mod physics;
 mod player;
 mod prelude;
+mod system;
 mod ui;
-mod utils;
 
-use bevy::{prelude::*, window::WindowResolution};
-use bevy_ecs_ldtk::prelude::*;
+use crate::prelude::*;
 
 use camera::CameraPlugin;
 use level::LevelPlugin;
 use physics::PhysicsPlugin;
 use player::PlayerPlugin;
-use ui::menu::MenuPlugin;
-
-#[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
-pub enum GameState {
-    #[default]
-    Menu,
-    InGame,
-}
+use system::resources::GameRegistry;
+use ui::menu::{MenuPlugin, resources::MatchConfig};
 
 fn main() {
     App::new()
@@ -36,9 +29,11 @@ fn main() {
                 }),
         )
         .init_state::<GameState>()
+        .init_state::<MenuState>()
+        .init_resource::<MatchConfig>()
+        .init_resource::<GameRegistry>()
         .add_plugins(CameraPlugin)
         .add_plugins(LevelPlugin)
-        .insert_resource(LevelSelection::index(0))
         .add_plugins(MenuPlugin)
         .add_plugins(PhysicsPlugin)
         .add_plugins(PlayerPlugin)

@@ -37,6 +37,11 @@ Without `PlayerSpawn`, no player will be created.
 
 In `Collisions`, the IntGrid value `1` is interpreted as a solid wall.
 
+### Game Registery
+
+To make the world visible in the game's selection menu, you have to add it into the Game Registery.
+It is located in `src/system/resources.rs` (under `impl Default for GameRegistry`). Here, you can add a new entry to the `worlds` vector with the path to your `.ldtk` file and a display name.
+
 ## 3. Recommended LDtk Workflow
 
 1. Duplicate an existing level (e.g. `cave.ldtk`) and rename it.
@@ -44,20 +49,10 @@ In `Collisions`, the IntGrid value `1` is interpreted as a solid wall.
 3. Draw the level art in `VisualBackground` and `VisualForeground`.
 4. Paint collisions in `Collisions` using the value `1`.
 5. Place one `PlayerSpawn` in the `Entities` layer.
-6. Save the LDtk project.
-
-## 4. Integrating a New Level Into the Game
-
-Current code behavior:
-
-- The loaded world is hardcoded to `assets/levels/cave.ldtk`.
-- The loaded level is `LevelSelection::index(0)`.
-
-So, to test a new level quickly, the simplest options are:
-
-- replace the contents of `assets/levels/cave.ldtk`
-- add your level to the same project while keeping index `0` for the level you want to test
-- replace the hardcoded path and index in the code, then recompile
+6. Edit the player spawn direction if needed by adding a `facing_dir` field to the entity and setting it to `-1.0` for left or `1.0` for right.
+7. Save the LDtk project.
+8. Add the new level to the Game Registery in `src/system/resources.rs` to make it visible in the game's selection menu.
+9. Test the level by running the game and selecting it from the menu.
 
 ## 5. Quick Pre-Test Checklist
 
@@ -65,6 +60,7 @@ So, to test a new level quickly, the simplest options are:
 - [ ] `Collisions` contains `1` cells wherever the player should be able to stand.
 - [ ] One `PlayerSpawn` is present.
 - [ ] The grid is set to `8 px`.
+- [ ] The level is added to the Game Registery.
 
 ## 6. Troubleshooting
 
@@ -81,11 +77,3 @@ So, to test a new level quickly, the simplest options are:
 
 - Check that the `Collisions` layer uses the IntGrid type.
 - Check that wall tiles use the value `1`.
-
-## 7. Recommended Next Improvements
-
-For a simpler level pipeline, the next useful improvements would be:
-
-- dynamic `.ldtk` file selection instead of hardcoding `cave.ldtk`,
-- level selection by LDtk identifier instead of index `0`,
-- automatic validation that fails on startup when required layers or entities are missing.

@@ -1,15 +1,27 @@
 use crate::prelude::*;
 
+use crate::ui::menu::resources::MatchConfig;
+
 use super::components::*;
 
-pub fn setup_level(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn((
-        LdtkWorldBundle {
-            ldtk_handle: asset_server.load("levels/cave.ldtk").into(),
-            ..Default::default()
-        },
-        ActiveLevel,
-    ));
+pub fn setup_level(
+    mut commands: Commands,
+    match_cfg: ResMut<MatchConfig>,
+    mut next_game_state: ResMut<NextState<GameState>>,
+) {
+    if let Some(handle) = &match_cfg.ldtk_handle {
+        commands.spawn((
+            LdtkWorldBundle {
+                ldtk_handle: handle.clone().into(),
+                ..Default::default()
+            },
+            ActiveLevel,
+        ));
+        commands.insert_resource(LevelSelection::index(match_cfg.level_index));
+    } else {
+        eprintln!("Critical error: [InGame] state but no LDTK handle available for level setup");
+        next_game_state.set(GameState::Menu);
+    }
 }
 
 pub fn setup_world_limits(
