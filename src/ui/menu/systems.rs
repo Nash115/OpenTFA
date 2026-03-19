@@ -2,6 +2,7 @@ use crate::prelude::*;
 
 use crate::system::consts::Z_UI;
 use crate::system::resources::GameRegistry;
+use crate::ui::controls::UIControls;
 
 use super::components::{MenuEntity, SelectEntity};
 use super::resources::MatchConfig;
@@ -22,14 +23,14 @@ pub fn setup_main_menu(mut commands: Commands) {
 }
 
 pub fn handle_main_menu(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
+    action_state: Res<ActionState<UIControls>>,
     mut next_state: ResMut<NextState<MenuState>>,
     mut app_exit: MessageWriter<AppExit>,
 ) {
-    if keyboard_input.just_pressed(KeyCode::Enter) {
+    if action_state.just_pressed(&UIControls::Confirm) {
         next_state.set(MenuState::CharSelect);
     }
-    if keyboard_input.just_pressed(KeyCode::Escape) {
+    if action_state.just_pressed(&UIControls::Menu) {
         app_exit.write(AppExit::Success);
     }
 }
@@ -80,15 +81,15 @@ pub fn show_char_select(
 }
 
 pub fn handle_char_select(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
+    action_state: Res<ActionState<UIControls>>,
     mut next_state: ResMut<NextState<MenuState>>,
     registry: Res<GameRegistry>,
     mut match_cfg: ResMut<MatchConfig>,
 ) {
-    if keyboard_input.just_pressed(KeyCode::Enter) {
+    if action_state.just_pressed(&UIControls::Confirm) {
         next_state.set(MenuState::WorldSelect);
     }
-    if keyboard_input.just_pressed(KeyCode::ArrowUp) {
+    if action_state.just_pressed(&UIControls::Up) {
         if match_cfg.char_register_id == 0 {
             match_cfg.char_register_id = registry.characters.len() - 1;
         } else {
@@ -96,10 +97,11 @@ pub fn handle_char_select(
                 (match_cfg.char_register_id - 1) % registry.characters.len();
         }
     }
-    if keyboard_input.just_pressed(KeyCode::ArrowDown) {
+    if action_state.just_pressed(&UIControls::Down) {
         match_cfg.char_register_id = (match_cfg.char_register_id + 1) % registry.characters.len();
     }
-    if keyboard_input.just_pressed(KeyCode::Escape) {
+    if action_state.just_pressed(&UIControls::Back) || action_state.just_pressed(&UIControls::Menu)
+    {
         next_state.set(MenuState::Main);
     }
 }
@@ -150,25 +152,26 @@ pub fn show_world_select(
 }
 
 pub fn handle_world_select(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
+    action_state: Res<ActionState<UIControls>>,
     mut next_state: ResMut<NextState<MenuState>>,
     registry: Res<GameRegistry>,
     mut match_cfg: ResMut<MatchConfig>,
 ) {
-    if keyboard_input.just_pressed(KeyCode::Enter) {
+    if action_state.just_pressed(&UIControls::Confirm) {
         next_state.set(MenuState::WorldLoading);
     }
-    if keyboard_input.just_pressed(KeyCode::ArrowUp) {
+    if action_state.just_pressed(&UIControls::Up) {
         if match_cfg.world_register_id == 0 {
             match_cfg.world_register_id = registry.worlds.len() - 1;
         } else {
             match_cfg.world_register_id = (match_cfg.world_register_id - 1) % registry.worlds.len();
         }
     }
-    if keyboard_input.just_pressed(KeyCode::ArrowDown) {
+    if action_state.just_pressed(&UIControls::Down) {
         match_cfg.world_register_id = (match_cfg.world_register_id + 1) % registry.worlds.len();
     }
-    if keyboard_input.just_pressed(KeyCode::Escape) {
+    if action_state.just_pressed(&UIControls::Back) || action_state.just_pressed(&UIControls::Menu)
+    {
         next_state.set(MenuState::Main);
     }
 }
@@ -197,7 +200,7 @@ pub fn setup_world_loading(
 }
 
 pub fn handle_world_loading(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
+    action_state: Res<ActionState<UIControls>>,
     config: Res<MatchConfig>,
     ldtk_projects: Res<Assets<LdtkProject>>,
     mut next_menu_state: ResMut<NextState<MenuState>>,
@@ -207,7 +210,8 @@ pub fn handle_world_loading(
             next_menu_state.set(MenuState::LevelSelect);
         }
     }
-    if keyboard_input.just_pressed(KeyCode::Escape) {
+    if action_state.just_pressed(&UIControls::Back) || action_state.just_pressed(&UIControls::Menu)
+    {
         next_menu_state.set(MenuState::Main);
     }
 }
@@ -267,7 +271,7 @@ pub fn show_level_select(
 }
 
 pub fn handle_level_select(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
+    action_state: Res<ActionState<UIControls>>,
     mut next_game_state: ResMut<NextState<GameState>>,
     mut next_menu_state: ResMut<NextState<MenuState>>,
     mut match_cfg: ResMut<MatchConfig>,
@@ -283,21 +287,22 @@ pub fn handle_level_select(
         next_menu_state.set(MenuState::Main);
         return;
     }
-    if keyboard_input.just_pressed(KeyCode::Enter) {
+    if action_state.just_pressed(&UIControls::Confirm) {
         next_menu_state.set(MenuState::Disabled);
         next_game_state.set(GameState::InGame);
     }
-    if keyboard_input.just_pressed(KeyCode::ArrowUp) {
+    if action_state.just_pressed(&UIControls::Up) {
         if match_cfg.level_index == 0 {
             match_cfg.level_index = levels_available - 1;
         } else {
             match_cfg.level_index = (match_cfg.level_index - 1) % levels_available;
         }
     }
-    if keyboard_input.just_pressed(KeyCode::ArrowDown) {
+    if action_state.just_pressed(&UIControls::Down) {
         match_cfg.level_index = (match_cfg.level_index + 1) % levels_available;
     }
-    if keyboard_input.just_pressed(KeyCode::Escape) {
+    if action_state.just_pressed(&UIControls::Back) || action_state.just_pressed(&UIControls::Menu)
+    {
         next_menu_state.set(MenuState::Main);
     }
 }

@@ -4,7 +4,7 @@ use crate::level::{Collider, SpawnFacingDir, SpawnPoint};
 use crate::physics::screen_wrap::components::Wrapable;
 use crate::system::aabb::*;
 use crate::system::resources::GameRegistry;
-use crate::ui::menu::resources::MatchConfig;
+use crate::ui::{controls::UIControls, menu::resources::MatchConfig};
 
 use super::components::*;
 use super::utils::*;
@@ -98,6 +98,7 @@ pub fn spawn_player(
 
 pub fn update_player(
     keyboard_input: Res<ButtonInput<KeyCode>>,
+    action_state: Res<ActionState<UIControls>>,
     time: Res<Time>,
     mut player_query: Query<(&mut Transform, &mut Player, &mut Sprite)>,
     collider_query: Query<&Transform, (With<Collider>, Without<Player>)>,
@@ -118,7 +119,7 @@ pub fn update_player(
             sprite.flip_x = false;
             player.facing_dir = 1.0;
         }
-        if keyboard_input.just_pressed(KeyCode::Escape) {
+        if action_state.just_pressed(&UIControls::Menu) {
             next_state.set(GameState::Menu);
         }
         if keyboard_input.just_pressed(KeyCode::KeyR) {

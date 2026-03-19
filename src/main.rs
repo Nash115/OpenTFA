@@ -13,7 +13,10 @@ use level::LevelPlugin;
 use physics::PhysicsPlugin;
 use player::PlayerPlugin;
 use system::resources::GameRegistry;
-use ui::menu::{MenuPlugin, resources::MatchConfig};
+use ui::{
+    controls::UIControls,
+    menu::{MenuPlugin, resources::MatchConfig},
+};
 
 fn main() {
     App::new()
@@ -32,6 +35,9 @@ fn main() {
         .init_state::<MenuState>()
         .init_resource::<MatchConfig>()
         .init_resource::<GameRegistry>()
+        .init_resource::<ActionState<UIControls>>()
+        .insert_resource(UIControls::default_input_map())
+        .add_plugins(InputManagerPlugin::<UIControls>::default())
         .add_plugins(CameraPlugin)
         .add_plugins(LevelPlugin)
         .add_plugins(MenuPlugin)
