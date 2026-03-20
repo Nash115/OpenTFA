@@ -17,22 +17,34 @@ impl UIControls {
         map.insert(UIControls::Up, KeyCode::ArrowUp);
         map.insert(UIControls::Up, KeyCode::KeyW);
         map.insert(UIControls::Up, GamepadButton::DPadUp);
-        map.insert(UIControls::Up, GamepadControlDirection::LEFT_UP);
+        map.insert(
+            UIControls::Up,
+            GamepadControlDirection::LEFT_UP.threshold(0.25),
+        );
 
         map.insert(UIControls::Down, KeyCode::ArrowDown);
         map.insert(UIControls::Down, KeyCode::KeyS);
         map.insert(UIControls::Down, GamepadButton::DPadDown);
-        map.insert(UIControls::Down, GamepadControlDirection::LEFT_DOWN);
+        map.insert(
+            UIControls::Down,
+            GamepadControlDirection::LEFT_DOWN.threshold(0.25),
+        );
 
         map.insert(UIControls::Left, KeyCode::ArrowLeft);
         map.insert(UIControls::Left, KeyCode::KeyA);
         map.insert(UIControls::Left, GamepadButton::DPadLeft);
-        map.insert(UIControls::Left, GamepadControlDirection::LEFT_LEFT);
+        map.insert(
+            UIControls::Left,
+            GamepadControlDirection::LEFT_LEFT.threshold(0.25),
+        );
 
         map.insert(UIControls::Right, KeyCode::ArrowRight);
         map.insert(UIControls::Right, KeyCode::KeyD);
         map.insert(UIControls::Right, GamepadButton::DPadRight);
-        map.insert(UIControls::Right, GamepadControlDirection::LEFT_RIGHT);
+        map.insert(
+            UIControls::Right,
+            GamepadControlDirection::LEFT_RIGHT.threshold(0.25),
+        );
 
         map.insert(UIControls::Confirm, KeyCode::Enter);
         map.insert(UIControls::Confirm, KeyCode::Space);
@@ -47,4 +59,12 @@ impl UIControls {
 
         map
     }
+}
+
+#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug, Reflect)]
+pub enum CharSelectAction {
+    Up,
+    Down,
+    ToggleReady,
+    Leave,
 }

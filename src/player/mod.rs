@@ -1,4 +1,5 @@
 mod components;
+pub mod controls;
 mod systems;
 mod utils;
 
@@ -10,10 +11,10 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, spawn_player.run_if(in_state(GameState::InGame)))
+        app.add_systems(Update, spawn_players.run_if(in_state(GameState::InGame)))
             .add_systems(
                 Update,
-                (update_player, animate_player)
+                (update_players, animate_players)
                     .chain()
                     .run_if(in_state(GameState::InGame)),
             )

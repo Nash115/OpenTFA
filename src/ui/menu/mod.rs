@@ -1,6 +1,7 @@
 mod components;
 pub mod resources;
 mod systems;
+mod utils;
 
 use crate::prelude::*;
 
@@ -27,7 +28,8 @@ impl Plugin for MenuPlugin {
         .add_systems(OnEnter(MenuState::CharSelect), setup_char_select)
         .add_systems(
             Update,
-            (show_char_select, handle_char_select)
+            (handle_players_join, handle_char_select, show_char_select)
+                .chain()
                 .run_if(in_state(GameState::Menu).and(in_state(MenuState::CharSelect))),
         )
         .add_systems(OnExit(MenuState::CharSelect), cleanup_menu)

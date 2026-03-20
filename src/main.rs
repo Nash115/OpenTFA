@@ -11,10 +11,10 @@ use crate::prelude::*;
 use camera::CameraPlugin;
 use level::LevelPlugin;
 use physics::PhysicsPlugin;
-use player::PlayerPlugin;
+use player::{PlayerPlugin, controls::PlayerControls};
 use system::resources::GameRegistry;
 use ui::{
-    controls::UIControls,
+    controls::{CharSelectAction, UIControls},
     menu::{MenuPlugin, resources::MatchConfig},
 };
 
@@ -38,6 +38,8 @@ fn main() {
         .init_resource::<ActionState<UIControls>>()
         .insert_resource(UIControls::default_input_map())
         .add_plugins(InputManagerPlugin::<UIControls>::default())
+        .add_plugins(InputManagerPlugin::<CharSelectAction>::default())
+        .add_plugins(InputManagerPlugin::<PlayerControls>::default())
         .add_plugins(CameraPlugin)
         .add_plugins(LevelPlugin)
         .add_plugins(MenuPlugin)

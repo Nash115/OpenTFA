@@ -4,12 +4,16 @@ use crate::level::{Collider, SpawnFacingDir, SpawnPoint};
 use crate::physics::screen_wrap::components::Wrapable;
 use crate::system::aabb::*;
 use crate::system::resources::GameRegistry;
-use crate::ui::{controls::UIControls, menu::resources::MatchConfig};
+use crate::ui::{
+    controls::UIControls,
+    menu::resources::{MatchConfig, PlayerDevice},
+};
 
 use super::components::*;
+use super::controls::PlayerControls;
 use super::utils::*;
 
-pub fn spawn_player(
+pub fn spawn_players(
     mut commands: Commands,
     query: Query<(Entity, &Transform, &SpawnFacingDir), Added<SpawnPoint>>,
     asset_server: Res<AssetServer>,
@@ -20,109 +24,163 @@ pub fn spawn_player(
     let Ok((spawn_entity, spawn_transform, spawn_facing_dir)) = query.single() else {
         return;
     };
-    let char_id = match_config.char_register_id;
-    let char_path = game_registry.characters[char_id].sprite_path.clone();
-    let walking_texture = asset_server.load(format!("{}/walking.png", char_path));
-    let walking_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
-        UVec2::splat(16),
-        4,
-        1,
-        None,
-        None,
-    ));
-    let jumping_texture = asset_server.load(format!("{}/jumping.png", char_path));
-    let jumping_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
-        UVec2::splat(16),
-        1,
-        1,
-        None,
-        None,
-    ));
-    let falling_texture = asset_server.load(format!("{}/falling.png", char_path));
-    let falling_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
-        UVec2::splat(16),
-        2,
-        1,
-        None,
-        None,
-    ));
-    let sliding_texture = asset_server.load(format!("{}/sliding.png", char_path));
-    let sliding_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
-        UVec2::splat(16),
-        2,
-        1,
-        None,
-        None,
-    ));
+    for (player_i, _) in match_config.players.iter().flatten().enumerate() {
+        let Some(ref player) = match_config.players[player_i] else {
+            continue;
+        };
+        let char_id = player.char_register_id;
+        let char_path = game_registry.characters[char_id].sprite_path.clone();
+        let walking_texture = asset_server.load(format!("{}/walking.png", char_path));
+        let walking_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
+            UVec2::splat(16),
+            4,
+            1,
+            None,
+            None,
+        ));
+        let jumping_texture = asset_server.load(format!("{}/jumping.png", char_path));
+        let jumping_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
+            UVec2::splat(16),
+            1,
+            1,
+            None,
+            None,
+        ));
+        let falling_texture = asset_server.load(format!("{}/falling.png", char_path));
+        let falling_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
+            UVec2::splat(16),
+            2,
+            1,
+            None,
+            None,
+        ));
+        let sliding_texture = asset_server.load(format!("{}/sliding.png", char_path));
+        let sliding_layout = texture_atlas_layouts.add(TextureAtlasLayout::from_grid(
+            UVec2::splat(16),
+            2,
+            1,
+            None,
+            None,
+        ));
 
-    let player_spawn_point = Transform::from_xyz(
-        spawn_transform.translation.x,
-        spawn_transform.translation.y,
-        Z_ENTITIES,
-    );
+        let player_spawn_point = Transform::from_xyz(
+            spawn_transform.translation.x,
+            spawn_transform.translation.y,
+            Z_ENTITIES,
+        );
 
-    commands.spawn((
-        Sprite {
-            image: walking_texture.clone(),
-            texture_atlas: Some(TextureAtlas {
-                layout: walking_layout.clone(),
-                index: 0,
-            }),
-            flip_x: spawn_facing_dir.0 == -1.0,
-            ..default()
-        },
-        player_spawn_point,
-        Player::new(
-            Vec3::new(
-                spawn_transform.translation.x,
-                spawn_transform.translation.y,
-                Z_ENTITIES,
+        let mut input_map = InputMap::default();
+        match player.device {
+            PlayerDevice::Keyboard => {
+                input_map
+                    .insert(PlayerControls::Left, KeyCode::ArrowLeft)
+                    .insert(PlayerControls::Left, KeyCode::KeyA)
+                    .insert(PlayerControls::Right, KeyCode::ArrowRight)
+                    .insert(PlayerControls::Right, KeyCode::KeyD)
+                    .insert(PlayerControls::Up, KeyCode::ArrowUp)
+                    .insert(PlayerControls::Up, KeyCode::KeyW)
+                    .insert(PlayerControls::Down, KeyCode::ArrowDown)
+                    .insert(PlayerControls::Down, KeyCode::KeyS)
+                    .insert(PlayerControls::Jump, KeyCode::Space)
+                    .insert(PlayerControls::Respawn, KeyCode::KeyR);
+            }
+            PlayerDevice::Gamepad(gamepad_entity) => {
+                input_map
+                    .insert(PlayerControls::Left, GamepadButton::DPadLeft)
+                    .insert(
+                        PlayerControls::Left,
+                        GamepadControlDirection::LEFT_LEFT.threshold(0.25),
+                    )
+                    .insert(PlayerControls::Right, GamepadButton::DPadRight)
+                    .insert(
+                        PlayerControls::Right,
+                        GamepadControlDirection::LEFT_RIGHT.threshold(0.25),
+                    )
+                    .insert(PlayerControls::Up, GamepadButton::DPadUp)
+                    .insert(
+                        PlayerControls::Up,
+                        GamepadControlDirection::LEFT_UP.threshold(0.25),
+                    )
+                    .insert(PlayerControls::Down, GamepadButton::DPadDown)
+                    .insert(
+                        PlayerControls::Down,
+                        GamepadControlDirection::LEFT_DOWN.threshold(0.25),
+                    )
+                    .insert(PlayerControls::Jump, GamepadButton::South)
+                    .insert(PlayerControls::Respawn, GamepadButton::Select)
+                    .set_gamepad(gamepad_entity);
+            }
+        };
+
+        commands.spawn((
+            ActionState::<PlayerControls>::default(),
+            input_map,
+            Sprite {
+                image: walking_texture.clone(),
+                texture_atlas: Some(TextureAtlas {
+                    layout: walking_layout.clone(),
+                    index: 0,
+                }),
+                flip_x: spawn_facing_dir.0 == -1.0,
+                ..default()
+            },
+            player_spawn_point,
+            Player::new(
+                Vec3::new(
+                    spawn_transform.translation.x,
+                    spawn_transform.translation.y,
+                    Z_ENTITIES,
+                ),
+                spawn_facing_dir.0,
             ),
-            spawn_facing_dir.0,
-        ),
-        PlayerSprites {
-            walking_texture,
-            walking_layout,
-            jumping_texture,
-            jumping_layout,
-            falling_texture,
-            falling_layout,
-            sliding_texture,
-            sliding_layout,
-        },
-        AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Wrapable,
-    ));
+            PlayerSprites {
+                walking_texture,
+                walking_layout,
+                jumping_texture,
+                jumping_layout,
+                falling_texture,
+                falling_layout,
+                sliding_texture,
+                sliding_layout,
+            },
+            AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+            Wrapable,
+        ));
+    }
     commands.entity(spawn_entity).despawn();
 }
 
-pub fn update_player(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    action_state: Res<ActionState<UIControls>>,
+pub fn update_players(
+    action_state_ui: Res<ActionState<UIControls>>,
     time: Res<Time>,
-    mut player_query: Query<(&mut Transform, &mut Player, &mut Sprite)>,
+    mut player_query: Query<(
+        &mut Transform,
+        &mut Player,
+        &mut Sprite,
+        &ActionState<PlayerControls>,
+    )>,
     collider_query: Query<&Transform, (With<Collider>, Without<Player>)>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-    for (mut transform, mut player, mut sprite) in &mut player_query {
+    for (mut transform, mut player, mut sprite, action_state_player) in &mut player_query {
         // ### HORISONTAL PLAYER CONTROL ###
 
         let mut input_x = 0.0;
 
-        if keyboard_input.pressed(KeyCode::ArrowLeft) || keyboard_input.pressed(KeyCode::KeyA) {
+        if action_state_player.pressed(&PlayerControls::Left) {
             input_x -= 1.0;
             sprite.flip_x = true;
             player.facing_dir = -1.0;
         }
-        if keyboard_input.pressed(KeyCode::ArrowRight) || keyboard_input.pressed(KeyCode::KeyD) {
+        if action_state_player.pressed(&PlayerControls::Right) {
             input_x += 1.0;
             sprite.flip_x = false;
             player.facing_dir = 1.0;
         }
-        if action_state.just_pressed(&UIControls::Menu) {
+        if action_state_ui.just_pressed(&UIControls::Menu) {
             next_state.set(GameState::Menu);
         }
-        if keyboard_input.just_pressed(KeyCode::KeyR) {
+        if action_state_player.just_pressed(&PlayerControls::Respawn) {
             player.respawn(&mut transform.translation);
         }
 
@@ -132,9 +190,8 @@ pub fn update_player(
 
         if player.is_grabbing_ledge {
             player.velocity = Vec3::ZERO;
-            if keyboard_input.just_pressed(KeyCode::Space)
-                || keyboard_input.just_pressed(KeyCode::ArrowUp)
-                || keyboard_input.just_pressed(KeyCode::KeyW)
+            if action_state_player.just_pressed(&PlayerControls::Jump)
+                || action_state_player.just_pressed(&PlayerControls::Up)
             {
                 player.is_grabbing_ledge = false;
                 player.velocity.y = JUMP_VELOCITY * FORCE_MULTIPLIER;
@@ -147,14 +204,9 @@ pub fn update_player(
                     break;
                 }
             };
-            if keyboard_input.just_pressed(KeyCode::ArrowDown)
-                || keyboard_input.just_pressed(KeyCode::KeyS)
-                || (wall_dir == -1.0
-                    && !(keyboard_input.pressed(KeyCode::KeyA)
-                        || keyboard_input.pressed(KeyCode::ArrowLeft)))
-                || (wall_dir == 1.0
-                    && !(keyboard_input.pressed(KeyCode::KeyD)
-                        || keyboard_input.pressed(KeyCode::ArrowRight)))
+            if action_state_player.just_pressed(&PlayerControls::Down)
+                || (wall_dir == -1.0 && !action_state_player.pressed(&PlayerControls::Left))
+                || (wall_dir == 1.0 && !action_state_player.pressed(&PlayerControls::Right))
             {
                 player.is_grabbing_ledge = false;
             }
@@ -177,7 +229,7 @@ pub fn update_player(
 
         // --- Jump and Wall Jumping ---
 
-        if keyboard_input.just_pressed(KeyCode::Space) {
+        if action_state_player.just_pressed(&PlayerControls::Jump) {
             if !player.is_airborne {
                 player.velocity.y = JUMP_VELOCITY * FORCE_MULTIPLIER;
             } else if let Some(wall_dir) = player.on_wall {
@@ -329,7 +381,7 @@ pub fn update_player(
     }
 }
 
-pub fn animate_player(
+pub fn animate_players(
     time: Res<Time>,
     mut query: Query<(&mut AnimationTimer, &mut Sprite, &PlayerSprites, &Player)>,
 ) {
