@@ -11,7 +11,7 @@ pub fn setup_camera(mut commands: Commands) {
 pub fn fit_camera_to_level(
     mut camera_query: Query<(&mut Transform, &mut Projection, &mut Camera), With<GameCamera>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
-    world_limits_query: Query<&WorldLimits, Added<WorldLimits>>,
+    world_limits_query: Query<&WorldLimits>,
 ) {
     let world_limits = match world_limits_query.single() {
         Ok(limits) => limits,
