@@ -1,26 +1,77 @@
 use crate::prelude::*;
 
-use crate::system::consts::Z_UI;
 use crate::system::resources::GameRegistry;
-use crate::ui::controls::{CharSelectAction, UIControls};
+use crate::ui::{
+    controls::{CharSelectAction, UIControls},
+    resources::UiIconAssets,
+    templates::{GamepadBtns, KeyboardBtns, UiIcons, spawn_input_icon, spawn_input_icons},
+};
 
-use super::components::{MenuEntity, PlayerIndex, SelectEntity};
+use super::components::{MenuEntity, PlayerIndex, ReadyCooldown, SelectContainer, SelectEntity};
 use super::resources::{MatchConfig, PlayerConfig, PlayerDevice};
 use super::utils::controller_already_joined;
 
 // --- Main menu ---
 
-pub fn setup_main_menu(mut commands: Commands) {
-    commands.spawn((
-        Text2d::new("OpenTFA\nPress Return to play"),
-        TextFont {
-            font_size: 30.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        Transform::from_xyz(0.0, 0.0, Z_UI),
-        MenuEntity,
-    ));
+pub fn setup_main_menu(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    icon_assets: Res<UiIconAssets>,
+) {
+    let bg_image = asset_server.load("ui/menu-wall.png");
+
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            ImageNode::new(bg_image),
+            MenuEntity,
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("OpenTFA"),
+                TextFont {
+                    font_size: 80.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::bottom(Val::Px(50.0)),
+                    ..default()
+                },
+            ));
+
+            parent
+                .spawn((Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },))
+                .with_children(|row| {
+                    row.spawn((
+                        Text::new("Play Versus"),
+                        TextFont {
+                            font_size: 40.0,
+                            ..default()
+                        },
+                    ));
+                    spawn_input_icons(
+                        row,
+                        &icon_assets,
+                        vec![
+                            UiIcons::KeyboardButton(KeyboardBtns::Enter),
+                            UiIcons::GamepadButton(GamepadBtns::A),
+                        ],
+                        None,
+                    );
+                });
+        });
 }
 
 pub fn handle_main_menu(
@@ -38,67 +89,301 @@ pub fn handle_main_menu(
 
 // --- Character selection ---
 
-pub fn setup_char_select(mut commands: Commands) {
+pub fn setup_char_select(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(MatchConfig::default());
-    commands.spawn((
-        Text2d::new("Select your character"),
-        TextFont {
-            font_size: 30.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        Transform::from_xyz(0.0, 0.0, Z_UI),
-        MenuEntity,
-    ));
+
+    let bg_image = asset_server.load("ui/menu-wall.png");
+
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(20.0),
+                ..default()
+            },
+            ImageNode::new(bg_image),
+            MenuEntity,
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("Select your character"),
+                TextFont {
+                    font_size: 60.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
+
+            parent.spawn((
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::FlexStart,
+                    column_gap: Val::Px(16.0),
+                    ..default()
+                },
+                SelectContainer,
+            ));
+        });
 }
 
 pub fn show_char_select(
     mut commands: Commands,
     registry: Res<GameRegistry>,
     match_cfg: Res<MatchConfig>,
-    query: Query<Entity, With<SelectEntity>>,
+    select_query: Query<Entity, With<SelectEntity>>,
+    container_query: Query<Entity, With<SelectContainer>>,
+    icon_assets: Res<UiIconAssets>,
 ) {
     if !match_cfg.is_changed() {
         return;
     }
 
-    for entity in &query {
+    for entity in &select_query {
         commands.entity(entity).despawn();
     }
 
-    for (player_i, _) in match_cfg.players.iter().enumerate() {
-        let Some(ref player) = match_cfg.players[player_i] else {
-            continue;
-        };
+    let Ok(container) = container_query.single() else {
+        return;
+    };
 
-        for (character_i, character) in registry.characters.iter().enumerate() {
-            let text_color = if player.char_register_id == character_i {
-                if player.ready {
-                    Color::linear_rgb(0.0, 200.0, 0.0)
-                } else {
-                    Color::linear_rgb(200.0, 200.0, 0.0)
-                }
+    let player_colors = [
+        Color::linear_rgb(1.0, 0.35, 0.35),
+        Color::linear_rgb(0.35, 0.55, 1.0),
+        Color::linear_rgb(0.35, 0.9, 0.35),
+        Color::linear_rgb(1.0, 0.85, 0.15),
+    ];
+
+    commands.entity(container).with_children(|parent| {
+        for player_i in 0..4usize {
+            let player_color = player_colors[player_i];
+
+            if let Some(ref player) = match_cfg.players[player_i] {
+                parent
+                    .spawn((
+                        Node {
+                            flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::Center,
+                            min_width: Val::Px(210.0),
+                            padding: UiRect::all(Val::Px(16.0)),
+                            row_gap: Val::Px(6.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.9)),
+                        SelectEntity,
+                    ))
+                    .with_children(|panel| {
+                        // Player header
+                        panel.spawn((
+                            Text::new(format!("Player {}", player_i + 1)),
+                            TextFont {
+                                font_size: 28.0,
+                                ..default()
+                            },
+                            TextColor(player_color),
+                        ));
+
+                        // Separator
+                        panel.spawn((
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Px(2.0),
+                                margin: UiRect::vertical(Val::Px(4.0)),
+                                ..default()
+                            },
+                            BackgroundColor(Color::linear_rgb(1.0, 1.0, 1.0)),
+                        ));
+
+                        // Character list
+                        for (char_i, character) in registry.characters.iter().enumerate() {
+                            let is_selected = player.char_register_id == char_i;
+                            let text_color = if is_selected {
+                                if player.ready {
+                                    Color::linear_rgb(0.1, 0.9, 0.1)
+                                } else {
+                                    Color::linear_rgb(1.0, 1.0, 0.0)
+                                }
+                            } else {
+                                Color::srgba(0.8, 0.8, 0.8, 0.6)
+                            };
+                            let prefix = if is_selected { "> " } else { "  " };
+                            panel.spawn((
+                                Text::new(format!("{}{}", prefix, character.name)),
+                                TextFont {
+                                    font_size: 22.0,
+                                    ..default()
+                                },
+                                TextColor(text_color),
+                            ));
+                        }
+
+                        // Separator
+                        panel.spawn((
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Px(2.0),
+                                margin: UiRect::vertical(Val::Px(4.0)),
+                                ..default()
+                            },
+                            BackgroundColor(Color::linear_rgb(1.0, 1.0, 1.0)),
+                        ));
+
+                        // Status
+                        let (status_text, status_color) = if player.ready {
+                            ("READY!", Color::linear_rgb(0.1, 0.9, 0.1))
+                        } else {
+                            ("Choosing...", Color::linear_rgb(1.0, 1.0, 1.0))
+                        };
+                        panel.spawn((
+                            Text::new(status_text),
+                            TextFont {
+                                font_size: 20.0,
+                                ..default()
+                            },
+                            TextColor(status_color),
+                        ));
+
+                        // Ready / Unready hint
+                        let ready_label = if player.ready { "Unready" } else { "Ready" };
+                        panel
+                            .spawn(Node {
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Center,
+                                column_gap: Val::Px(4.0),
+                                ..default()
+                            })
+                            .with_children(|row| {
+                                match player.device {
+                                    PlayerDevice::Keyboard => {
+                                        spawn_input_icon(
+                                            row,
+                                            &icon_assets,
+                                            UiIcons::KeyboardButton(KeyboardBtns::Space),
+                                            Some(24.0),
+                                        );
+                                    }
+                                    PlayerDevice::Gamepad(_) => {
+                                        spawn_input_icon(
+                                            row,
+                                            &icon_assets,
+                                            UiIcons::GamepadButton(GamepadBtns::A),
+                                            Some(24.0),
+                                        );
+                                    }
+                                }
+                                row.spawn((
+                                    Text::new(ready_label),
+                                    TextFont {
+                                        font_size: 16.0,
+                                        ..default()
+                                    },
+                                    TextColor(Color::linear_rgb(1.0, 1.0, 1.0)),
+                                ));
+                            });
+
+                        // Leave hint (only when not ready)
+                        if !player.ready {
+                            panel
+                                .spawn(Node {
+                                    flex_direction: FlexDirection::Row,
+                                    align_items: AlignItems::Center,
+                                    column_gap: Val::Px(4.0),
+                                    ..default()
+                                })
+                                .with_children(|row| {
+                                    match player.device {
+                                        PlayerDevice::Keyboard => {
+                                            spawn_input_icon(
+                                                row,
+                                                &icon_assets,
+                                                UiIcons::KeyboardButton(KeyboardBtns::Backspace),
+                                                Some(24.0),
+                                            );
+                                        }
+                                        PlayerDevice::Gamepad(_) => {
+                                            spawn_input_icon(
+                                                row,
+                                                &icon_assets,
+                                                UiIcons::GamepadButton(GamepadBtns::B),
+                                                Some(24.0),
+                                            );
+                                        }
+                                    }
+                                    row.spawn((
+                                        Text::new("Leave"),
+                                        TextFont {
+                                            font_size: 16.0,
+                                            ..default()
+                                        },
+                                        TextColor(Color::linear_rgb(1.0, 1.0, 1.0)),
+                                    ));
+                                });
+                        }
+                    });
             } else {
-                Color::WHITE
-            };
+                // Empty slot
+                parent
+                    .spawn((
+                        Node {
+                            flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::Center,
+                            justify_content: JustifyContent::Center,
+                            min_width: Val::Px(210.0),
+                            min_height: Val::Px(220.0),
+                            padding: UiRect::all(Val::Px(16.0)),
+                            row_gap: Val::Px(8.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.9)),
+                        SelectEntity,
+                    ))
+                    .with_children(|panel| {
+                        spawn_input_icon(panel, &icon_assets, UiIcons::Ghost, Some(52.0));
 
-            commands.spawn((
-                Text2d::new(&character.name),
-                TextFont {
-                    font_size: 30.0,
-                    ..default()
-                },
-                TextColor(text_color),
-                Transform::from_xyz(
-                    -300.0 + (player_i as f32 * 150.0),
-                    -60.0 - (character_i as f32 * 30.0),
-                    Z_UI,
-                ),
-                MenuEntity,
-                SelectEntity,
-            ));
+                        panel.spawn((
+                            Text::new(format!("P{}", player_i + 1)),
+                            TextFont {
+                                font_size: 36.0,
+                                ..default()
+                            },
+                            TextColor(Color::linear_rgb(1.0, 1.0, 1.0)),
+                        ));
+
+                        panel
+                            .spawn(Node {
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Center,
+                                column_gap: Val::Px(4.0),
+                                ..default()
+                            })
+                            .with_children(|row| {
+                                spawn_input_icons(
+                                    row,
+                                    &icon_assets,
+                                    vec![
+                                        UiIcons::KeyboardButton(KeyboardBtns::Enter),
+                                        UiIcons::GamepadButton(GamepadBtns::A),
+                                    ],
+                                    Some(24.0),
+                                );
+                            });
+
+                        panel.spawn((
+                            Text::new("to join"),
+                            TextFont {
+                                font_size: 18.0,
+                                ..default()
+                            },
+                            TextColor(Color::linear_rgb(1.0, 1.0, 1.0)),
+                        ));
+                    });
+            }
         }
-    }
+    });
 }
 
 pub fn handle_players_join(
@@ -117,7 +402,6 @@ pub fn handle_players_join(
                 device: PlayerDevice::Keyboard,
                 char_register_id: 0,
                 ready: false,
-                join_cooldown: Timer::from_seconds(0.3, TimerMode::Once),
             });
 
             let mut input_map = InputMap::default();
@@ -135,6 +419,7 @@ pub fn handle_players_join(
                 ActionState::<CharSelectAction>::default(),
                 input_map,
                 MenuEntity,
+                ReadyCooldown(Timer::from_seconds(0.3, TimerMode::Once)),
             ));
         }
     }
@@ -146,7 +431,6 @@ pub fn handle_players_join(
                     device: PlayerDevice::Gamepad(gamepad_entity),
                     char_register_id: 0,
                     ready: false,
-                    join_cooldown: Timer::from_seconds(0.3, TimerMode::Once),
                 });
 
                 let mut input_map = InputMap::default();
@@ -170,6 +454,7 @@ pub fn handle_players_join(
                     ActionState::<CharSelectAction>::default(),
                     input_map,
                     MenuEntity,
+                    ReadyCooldown(Timer::from_seconds(0.3, TimerMode::Once)),
                 ));
             }
         }
@@ -180,7 +465,12 @@ pub fn handle_char_select(
     mut commands: Commands,
     mut match_cfg: ResMut<MatchConfig>,
     registry: Res<GameRegistry>,
-    query: Query<(Entity, &ActionState<CharSelectAction>, &PlayerIndex)>,
+    mut query: Query<(
+        Entity,
+        &ActionState<CharSelectAction>,
+        &PlayerIndex,
+        &mut ReadyCooldown,
+    )>,
     mut next_menu_state: ResMut<NextState<MenuState>>,
     time: Res<Time>,
     action_state_ui: Res<ActionState<UIControls>>,
@@ -192,40 +482,55 @@ pub fn handle_char_select(
 
     let mut player_leave_this_frame = false;
 
-    for (controller_entity, action_state, player_index) in query.iter() {
-        let Some(Some(player_cfg)) = match_cfg.players.get_mut(player_index.0) else {
-            continue;
-        };
-
-        player_cfg.join_cooldown.tick(time.delta());
-        if !player_cfg.join_cooldown.is_finished() {
+    for (controller_entity, action_state, player_index, mut ready_cooldown) in query.iter_mut() {
+        ready_cooldown.0.tick(time.delta());
+        if !ready_cooldown.0.is_finished() {
             continue;
         }
 
-        if action_state.just_pressed(&CharSelectAction::Leave) {
+        let Some(player_cfg_read) = &match_cfg.players[player_index.0] else {
+            continue;
+        };
+
+        let is_ready = player_cfg_read.ready;
+        let wants_leave = action_state.just_pressed(&CharSelectAction::Leave);
+        let wants_ready = action_state.just_pressed(&CharSelectAction::ToggleReady);
+        let wants_up = action_state.just_pressed(&CharSelectAction::Up);
+        let wants_down = action_state.just_pressed(&CharSelectAction::Down);
+
+        if !wants_leave && !wants_ready && !wants_up && !wants_down {
+            continue;
+        }
+
+        let Some(player_cfg_mut) = &mut match_cfg.players[player_index.0] else {
+            continue;
+        };
+
+        if wants_leave {
             match_cfg.players[player_index.0] = None;
             commands.entity(controller_entity).despawn();
             player_leave_this_frame = true;
             continue;
         }
 
-        if player_cfg.ready {
+        if is_ready {
             if action_state.just_pressed(&CharSelectAction::ToggleReady) {
-                player_cfg.ready = false;
+                player_cfg_mut.ready = false;
             }
             continue;
         }
 
         if action_state.just_pressed(&CharSelectAction::Down) {
-            player_cfg.char_register_id = (player_cfg.char_register_id + 1) % max_chars;
+            player_cfg_mut.char_register_id = (player_cfg_mut.char_register_id + 1) % max_chars;
         }
 
         if action_state.just_pressed(&CharSelectAction::Up) {
-            player_cfg.char_register_id = (player_cfg.char_register_id + max_chars - 1) % max_chars;
+            player_cfg_mut.char_register_id =
+                (player_cfg_mut.char_register_id + max_chars - 1) % max_chars;
         }
 
         if action_state.just_pressed(&CharSelectAction::ToggleReady) {
-            player_cfg.ready = true;
+            player_cfg_mut.ready = true;
         }
     }
 
@@ -258,47 +563,140 @@ pub fn handle_char_select(
 
 // --- World selection ---
 
-pub fn setup_world_select(mut commands: Commands) {
-    commands.spawn((
-        Text2d::new("Select a world\nPress Return to confirm"),
-        TextFont {
-            font_size: 30.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        Transform::from_xyz(0.0, 0.0, Z_UI),
-        MenuEntity,
-    ));
+pub fn setup_world_select(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let bg_image = asset_server.load("ui/menu-wall.png");
+
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(20.0),
+                ..default()
+            },
+            ImageNode::new(bg_image),
+            MenuEntity,
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("Select a world"),
+                TextFont {
+                    font_size: 60.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
+
+            parent.spawn((
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::FlexStart,
+                    column_gap: Val::Px(16.0),
+                    ..default()
+                },
+                SelectContainer,
+            ));
+        });
 }
 
 pub fn show_world_select(
     mut commands: Commands,
     registry: Res<GameRegistry>,
     match_cfg: Res<MatchConfig>,
-    query: Query<Entity, With<SelectEntity>>,
+    select_query: Query<Entity, With<SelectEntity>>,
+    container_query: Query<Entity, With<SelectContainer>>,
+    icon_assets: Res<UiIconAssets>,
 ) {
-    for entity in &query {
+    if !match_cfg.is_changed() {
+        return;
+    }
+
+    for entity in &select_query {
         commands.entity(entity).despawn();
     }
 
-    for (i, world) in registry.worlds.iter().enumerate() {
-        let text_color = if match_cfg.world_register_id == i {
-            Color::linear_rgb(200.0, 200.0, 0.0)
-        } else {
-            Color::WHITE
-        };
-        commands.spawn((
-            Text2d::new(&world.name),
-            TextFont {
-                font_size: 30.0,
-                ..default()
-            },
-            TextColor(text_color),
-            Transform::from_xyz(0.0, -60.0 - (i as f32 * 30.0), Z_UI),
-            MenuEntity,
-            SelectEntity,
-        ));
-    }
+    let Ok(container) = container_query.single() else {
+        return;
+    };
+
+    commands.entity(container).with_children(|parent| {
+        parent
+            .spawn((
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    min_width: Val::Px(210.0),
+                    padding: UiRect::all(Val::Px(16.0)),
+                    row_gap: Val::Px(6.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.9)),
+                SelectEntity,
+            ))
+            .with_children(|panel| {
+                // World entries
+                for (i, world) in registry.worlds.iter().enumerate() {
+                    let is_selected = match_cfg.world_register_id == i;
+                    let text_color = if is_selected {
+                        Color::linear_rgb(1.0, 1.0, 0.0)
+                    } else {
+                        Color::srgba(0.8, 0.8, 0.8, 0.6)
+                    };
+                    let prefix = if is_selected { "> " } else { "  " };
+                    panel.spawn((
+                        Text::new(format!("{}{}", prefix, world.name)),
+                        TextFont {
+                            font_size: 22.0,
+                            ..default()
+                        },
+                        TextColor(text_color),
+                    ));
+                }
+
+                // Separator
+                panel.spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(2.0),
+                        margin: UiRect::vertical(Val::Px(4.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::linear_rgb(1.0, 1.0, 1.0)),
+                ));
+
+                // Choose hint
+                panel
+                    .spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(4.0),
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        spawn_input_icons(
+                            row,
+                            &icon_assets,
+                            vec![
+                                UiIcons::KeyboardButton(KeyboardBtns::Enter),
+                                UiIcons::GamepadButton(GamepadBtns::A),
+                            ],
+                            Some(24.0),
+                        );
+                        row.spawn((
+                            Text::new("Choose world"),
+                            TextFont {
+                                font_size: 16.0,
+                                ..default()
+                            },
+                            TextColor(Color::linear_rgb(1.0, 1.0, 1.0)),
+                        ));
+                    });
+            });
+    });
 }
 
 pub fn handle_world_select(
@@ -336,14 +734,19 @@ pub fn setup_world_loading(
     registry: Res<GameRegistry>,
     mut match_cfg: ResMut<MatchConfig>,
 ) {
+    let bg_image = asset_server.load("ui/menu-wall.png");
+
     commands.spawn((
-        Text2d::new("The world is loading..."),
-        TextFont {
-            font_size: 30.0,
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(20.0),
             ..default()
         },
-        TextColor(Color::WHITE),
-        Transform::from_xyz(0.0, 0.0, Z_UI),
+        ImageNode::new(bg_image),
         MenuEntity,
     ));
     let world_ldtk_path = &registry.worlds[match_cfg.world_register_id].ldtk_path;
@@ -372,26 +775,59 @@ pub fn handle_world_loading(
 
 // --- Level selection ---
 
-pub fn setup_level_select(mut commands: Commands) {
-    commands.spawn((
-        Text2d::new("Select a level\nPress Return to confirm"),
-        TextFont {
-            font_size: 30.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        Transform::from_xyz(0.0, 0.0, Z_UI),
-        MenuEntity,
-    ));
+pub fn setup_level_select(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let bg_image = asset_server.load("ui/menu-wall.png");
+
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(20.0),
+                ..default()
+            },
+            ImageNode::new(bg_image),
+            MenuEntity,
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("Select a level"),
+                TextFont {
+                    font_size: 60.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
+
+            parent.spawn((
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::FlexStart,
+                    column_gap: Val::Px(16.0),
+                    ..default()
+                },
+                SelectContainer,
+            ));
+        });
 }
 
 pub fn show_level_select(
     mut commands: Commands,
     match_cfg: Res<MatchConfig>,
-    query: Query<Entity, With<SelectEntity>>,
     ldtk_projects: Res<Assets<LdtkProject>>,
+    select_query: Query<Entity, With<SelectEntity>>,
+    container_query: Query<Entity, With<SelectContainer>>,
+    icon_assets: Res<UiIconAssets>,
 ) {
-    for entity in &query {
+    if !match_cfg.is_changed() {
+        return;
+    }
+
+    for entity in &select_query {
         commands.entity(entity).despawn();
     }
 
@@ -404,24 +840,84 @@ pub fn show_level_select(
         }
     }
 
-    for (i, level_identifier) in levels_identifiers.iter().enumerate() {
-        let text_color = if match_cfg.level_index == i {
-            Color::linear_rgb(200.0, 200.0, 0.0)
-        } else {
-            Color::WHITE
-        };
-        commands.spawn((
-            Text2d::new(level_identifier),
-            TextFont {
-                font_size: 30.0,
-                ..default()
-            },
-            TextColor(text_color),
-            Transform::from_xyz(0.0, -60.0 - (i as f32 * 30.0), Z_UI),
-            MenuEntity,
-            SelectEntity,
-        ));
-    }
+    let Ok(container) = container_query.single() else {
+        return;
+    };
+
+    commands.entity(container).with_children(|parent| {
+        parent
+            .spawn((
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    min_width: Val::Px(210.0),
+                    padding: UiRect::all(Val::Px(16.0)),
+                    row_gap: Val::Px(6.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.9)),
+                SelectEntity,
+            ))
+            .with_children(|panel| {
+                // World entries
+                for (i, level_identifier) in levels_identifiers.iter().enumerate() {
+                    let is_selected = match_cfg.level_index == i;
+                    let text_color = if is_selected {
+                        Color::linear_rgb(1.0, 1.0, 0.0)
+                    } else {
+                        Color::srgba(0.8, 0.8, 0.8, 0.6)
+                    };
+                    let prefix = if is_selected { "> " } else { "  " };
+                    panel.spawn((
+                        Text::new(format!("{}{}", prefix, level_identifier)),
+                        TextFont {
+                            font_size: 22.0,
+                            ..default()
+                        },
+                        TextColor(text_color),
+                    ));
+                }
+
+                // Separator
+                panel.spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(2.0),
+                        margin: UiRect::vertical(Val::Px(4.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::linear_rgb(1.0, 1.0, 1.0)),
+                ));
+
+                // Choose hint
+                panel
+                    .spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(4.0),
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        spawn_input_icons(
+                            row,
+                            &icon_assets,
+                            vec![
+                                UiIcons::KeyboardButton(KeyboardBtns::Enter),
+                                UiIcons::GamepadButton(GamepadBtns::A),
+                            ],
+                            Some(24.0),
+                        );
+                        row.spawn((
+                            Text::new("Choose world"),
+                            TextFont {
+                                font_size: 16.0,
+                                ..default()
+                            },
+                            TextColor(Color::linear_rgb(1.0, 1.0, 1.0)),
+                        ));
+                    });
+            });
+    });
 }
 
 pub fn handle_level_select(

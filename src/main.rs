@@ -14,8 +14,10 @@ use physics::PhysicsPlugin;
 use player::{PlayerPlugin, controls::PlayerControls};
 use system::resources::GameRegistry;
 use ui::{
+    UiPlugin,
     controls::{CharSelectAction, UIControls},
     menu::{MenuPlugin, resources::MatchConfig},
+    resources::UiIconAssets,
 };
 
 fn main() {
@@ -35,6 +37,7 @@ fn main() {
         .init_state::<MenuState>()
         .init_resource::<MatchConfig>()
         .init_resource::<GameRegistry>()
+        .init_resource::<UiIconAssets>()
         .init_resource::<ActionState<UIControls>>()
         .insert_resource(UIControls::default_input_map())
         .add_plugins(InputManagerPlugin::<UIControls>::default())
@@ -45,5 +48,6 @@ fn main() {
         .add_plugins(MenuPlugin)
         .add_plugins(PhysicsPlugin)
         .add_plugins(PlayerPlugin)
+        .add_plugins(UiPlugin)
         .run();
 }

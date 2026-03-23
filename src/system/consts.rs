@@ -5,7 +5,6 @@ use crate::prelude::*;
 pub const Z_TILES_BACK: f32 = 1.0;
 pub const Z_ENTITIES: f32 = 5.0;
 pub const Z_TILES_FG: f32 = 10.0;
-pub const Z_UI: f32 = 100.0;
 
 // --- Player Constants ---
 

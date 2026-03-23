@@ -10,7 +10,6 @@ pub struct PlayerConfig {
     pub device: PlayerDevice,
     pub char_register_id: usize,
     pub ready: bool,
-    pub join_cooldown: Timer,
 }
 
 #[derive(Resource, Debug)]
