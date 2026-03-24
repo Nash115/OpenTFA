@@ -1,4 +1,4 @@
-mod components;
+pub mod components;
 pub mod controls;
 mod systems;
 mod utils;
@@ -14,7 +14,7 @@ impl Plugin for PlayerPlugin {
         app.add_systems(Update, spawn_players.run_if(in_state(GameState::InGame)))
             .add_systems(
                 Update,
-                (update_players, animate_players)
+                (update_players, animate_players, update_floating_inventory)
                     .chain()
                     .run_if(in_state(GameState::InGame)),
             )

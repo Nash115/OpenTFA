@@ -1,3 +1,4 @@
+mod arrow;
 mod camera;
 mod level;
 mod physics;
@@ -8,6 +9,7 @@ mod ui;
 
 use crate::prelude::*;
 
+use arrow::ArrowPlugin;
 use camera::CameraPlugin;
 use level::LevelPlugin;
 use physics::PhysicsPlugin;
@@ -43,6 +45,7 @@ fn main() {
         .add_plugins(InputManagerPlugin::<UIControls>::default())
         .add_plugins(InputManagerPlugin::<CharSelectAction>::default())
         .add_plugins(InputManagerPlugin::<PlayerControls>::default())
+        .add_plugins(ArrowPlugin)
         .add_plugins(CameraPlugin)
         .add_plugins(LevelPlugin)
         .add_plugins(MenuPlugin)

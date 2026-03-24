@@ -1,5 +1,7 @@
 use crate::prelude::*;
 
+use crate::arrow::components::ArrowType;
+
 #[derive(Component, Clone, Copy)]
 pub struct Player {
     pub speed: f32,
@@ -60,3 +62,18 @@ pub struct PlayerSprites {
 
 #[derive(Component)]
 pub struct AnimationTimer(pub Timer);
+
+#[derive(Component)]
+pub struct Inventory {
+    pub arrows: Vec<ArrowType>,
+}
+impl Default for Inventory {
+    fn default() -> Self {
+        Self {
+            arrows: vec![ArrowType::Normal, ArrowType::Normal, ArrowType::Normal],
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct ArrowIndicator;

@@ -5,6 +5,7 @@ use crate::prelude::*;
 pub const Z_TILES_BACK: f32 = 1.0;
 pub const Z_ENTITIES: f32 = 5.0;
 pub const Z_TILES_FG: f32 = 10.0;
+pub const Z_UI: f32 = 100.0;
 
 // --- Player Constants ---
 
@@ -12,10 +13,17 @@ pub const JUMP_VELOCITY: f32 = 3.5;
 pub const SLIDE_MAX_VELOCITY: f32 = -1.0;
 pub const PLAYER_SIZE: Vec2 = Vec2::new(10.0, 15.0);
 
+// --- Arrow Constants ---
+
+pub const ARROW_VELOCITY: f32 = 5.0;
+pub const ARROW_ENTIRE_SIZE: Vec2 = Vec2::new(7.0, 7.0);
+pub const ARROW_TIP_SIZE: Vec2 = Vec2::new(0.5, 0.5);
+pub const ARROW_TIP_DISTANCE: f32 = 5.0;
+
 // --- Physics Constants ---
 
 pub const GRAVITY: f32 = -9.81;
-pub const FORCE_MULTIPLIER: f32 = 50.0;
+pub const FORCE_MULTIPLIER: f32 = 42.0;
 
 // --- Tile Constants ---
 

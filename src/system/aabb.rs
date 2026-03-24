@@ -6,7 +6,6 @@ pub struct Aabb {
     pub bottom: f32,
     pub top: f32,
 }
-
 impl Aabb {
     pub fn new_sprite_box(pos: Vec3, size: Vec2) -> Self {
         Self {

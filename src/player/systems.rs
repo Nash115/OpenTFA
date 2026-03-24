@@ -1,8 +1,9 @@
 use crate::prelude::*;
 
+use crate::arrow::components::{Arrow, ArrowType};
 use crate::level::{Collider, SpawnFacingDir, SpawnPoint};
 use crate::physics::screen_wrap::components::Wrapable;
-use crate::system::aabb::*;
+use crate::system::aabb::Aabb;
 use crate::system::resources::GameRegistry;
 use crate::ui::{
     controls::UIControls,
@@ -82,6 +83,7 @@ pub fn spawn_players(
                     .insert(PlayerControls::Down, KeyCode::ArrowDown)
                     .insert(PlayerControls::Down, KeyCode::KeyS)
                     .insert(PlayerControls::Jump, KeyCode::Space)
+                    .insert(PlayerControls::Shoot, KeyCode::Enter)
                     .insert(PlayerControls::Respawn, KeyCode::KeyR);
             }
             PlayerDevice::Gamepad(gamepad_entity) => {
@@ -107,6 +109,7 @@ pub fn spawn_players(
                         GamepadControlDirection::LEFT_DOWN.threshold(0.25),
                     )
                     .insert(PlayerControls::Jump, GamepadButton::South)
+                    .insert(PlayerControls::Shoot, GamepadButton::West)
                     .insert(PlayerControls::Respawn, GamepadButton::Select)
                     .set_gamepad(gamepad_entity);
             }
@@ -144,6 +147,7 @@ pub fn spawn_players(
                 sliding_layout,
             },
             AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+            Inventory::default(),
             Wrapable,
         ));
     }
@@ -151,6 +155,8 @@ pub fn spawn_players(
 }
 
 pub fn update_players(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
     action_state_ui: Res<ActionState<UIControls>>,
     time: Res<Time>,
     mut player_query: Query<(
@@ -158,14 +164,18 @@ pub fn update_players(
         &mut Player,
         &mut Sprite,
         &ActionState<PlayerControls>,
+        &mut Inventory,
     )>,
     collider_query: Query<&Transform, (With<Collider>, Without<Player>)>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-    for (mut transform, mut player, mut sprite, action_state_player) in &mut player_query {
-        // ### HORISONTAL PLAYER CONTROL ###
+    for (mut transform, mut player, mut sprite, action_state_player, mut inventory) in
+        &mut player_query
+    {
+        // ### HORISONTAL / VERTICAL PLAYER CONTROL ###
 
         let mut input_x = 0.0;
+        let mut input_y = 0.0;
 
         if action_state_player.pressed(&PlayerControls::Left) {
             input_x -= 1.0;
@@ -177,6 +187,46 @@ pub fn update_players(
             sprite.flip_x = false;
             player.facing_dir = 1.0;
         }
+        if action_state_player.pressed(&PlayerControls::Up) {
+            input_y += 1.0;
+        }
+        if action_state_player.pressed(&PlayerControls::Down) {
+            input_y -= 1.0;
+        }
+
+        // ### SHOOT ARROW ###
+
+        if action_state_player.just_released(&PlayerControls::Shoot) && !inventory.arrows.is_empty()
+        {
+            let arrow_to_shoot = inventory.arrows.pop().unwrap();
+            let dir_y = input_y;
+            let dir_x = match input_x {
+                0.0 => match dir_y {
+                    0.0 => player.facing_dir,
+                    _ => 0.0,
+                },
+                _ => input_x,
+            };
+            let direction = Vec3::new(dir_x, dir_y, 0.0).normalize();
+            let arrow_sprite_img = match arrow_to_shoot {
+                ArrowType::Normal => asset_server.load("sprites/arrow/arrow.png"),
+            };
+            commands.spawn((
+                Sprite {
+                    image: arrow_sprite_img,
+                    ..default()
+                },
+                Transform::from_translation(transform.translation + direction * 0.5),
+                Arrow::new(arrow_to_shoot, direction),
+                Wrapable,
+            ));
+        }
+        if action_state_player.pressed(&PlayerControls::Shoot) {
+            input_x = 0.0;
+        }
+
+        // ### MISC CONTROLS ###
+
         if action_state_ui.just_pressed(&UIControls::Menu) {
             next_state.set(GameState::Menu);
         }
@@ -446,6 +496,52 @@ pub fn animate_players(
                 atlas.index = 0;
             }
         }
+    }
+}
+
+pub fn update_floating_inventory(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    query: Query<(Entity, &Inventory), Changed<Inventory>>,
+    children_query: Query<&Children>,
+    indicator_query: Query<Entity, With<ArrowIndicator>>,
+) {
+    let spacing = 4.0;
+    let height_offset = 13.0;
+
+    for (player_entity, inventory) in &query {
+        if let Ok(children) = children_query.get(player_entity) {
+            for child in children.iter() {
+                if indicator_query.contains(child) {
+                    commands.entity(child).despawn();
+                }
+            }
+        }
+
+        if inventory.arrows.len() == 0 {
+            continue;
+        }
+
+        let start_x = -((inventory.arrows.len() as f32 - 1.0) * spacing) / 2.0;
+
+        commands.entity(player_entity).with_children(|parent| {
+            for (i, arrow) in inventory.arrows.iter().enumerate() {
+                let x_pos = start_x + (i as f32 * spacing);
+
+                let icon_texture = match arrow {
+                    ArrowType::Normal => asset_server.load("sprites/arrow/normal_indicator.png"),
+                };
+
+                parent.spawn((
+                    Sprite {
+                        image: icon_texture.clone(),
+                        ..default()
+                    },
+                    Transform::from_xyz(x_pos, height_offset, Z_UI),
+                    ArrowIndicator,
+                ));
+            }
+        });
     }
 }
 

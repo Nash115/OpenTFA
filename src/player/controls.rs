@@ -7,5 +7,6 @@ pub enum PlayerControls {
     Up,
     Down,
     Jump,
+    Shoot,
     Respawn,
 }
